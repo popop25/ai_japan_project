@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from textwrap import dedent
 
@@ -25,11 +25,11 @@ def render_context_markdown(context: ProjectContext) -> str:
 
             ## Current Status
             - 현재 단계: {context.current_stage}
-            - 진행중인 작업: {context.active_work}
+            - 진행 중인 작업: {context.active_work}
             - 마지막 업데이트: {context.last_updated}
 
             ## Constraints
-            - 기술적 제약: {context.constraints.technical}
+            - 기술 제약: {context.constraints.technical}
             - 일정 제약: {context.constraints.schedule}
             - 기타: {context.constraints.other}
 
@@ -62,25 +62,25 @@ def render_pm_packet(task: Task, context_markdown: str, pm_skill_markdown: str) 
             - Deliverable: 요구사항 정의서 초안
 
             ## Objective
-            프로젝트 맥락을 바탕으로 이해관계자가 바로 읽고 피드백할 수 있는 요구사항 정의서 초안을 작성한다.
+            프로젝트 맥락을 바탕으로 이해관계자가 바로 읽고 피드백할 수 있는 요구사항 정의서 초안을 작성합니다.
 
             ## Input References
             - project/03_context.md
             - project/skills/pm.md
 
             ## Output Contract
-            - Markdown 문서로만 응답한다.
-            - 반드시 다음 섹션을 포함한다.
+            - Markdown 문서로만 응답합니다.
+            - 반드시 아래 섹션을 포함합니다.
               - 배경
               - 목표
               - 기능 요구사항
               - 비기능 요구사항
               - 오픈 이슈
               - 다음 액션
-            - 맥락에 없는 사실은 단정하지 말고 `확인 필요`라고 표기한다.
+            - 맥락에 없는 사실은 추정하지 말고 `확인 필요`라고 표시합니다.
 
             ## Handoff Instructions
-            아래 Context와 Skill 문서를 읽고 결과물을 작성한 뒤, 최종 Markdown만 반환한다.
+            아래 Context와 Skill 문서를 읽고 결과물을 작성한 뒤 최종 Markdown만 반환합니다.
 
             ---
 
@@ -114,15 +114,15 @@ def render_critic_packet(
             - Stage: critic review
 
             ## Objective
-            PM 에이전트가 작성한 요구사항 정의서 초안을 검토하고 승인 또는 수정 필요 여부를 판단한다.
+            PM 에이전트가 작성한 요구사항 정의서 초안을 검토하고 승인 또는 수정 필요 여부를 판단합니다.
 
             ## Output Contract
-            - 반드시 YAML front matter를 포함한다.
-            - `verdict`는 `approve` 또는 `revise`만 사용한다.
-            - `summary`, `missing_items`, `recommended_changes`를 모두 포함한다.
+            - 반드시 YAML front matter를 포함합니다.
+            - `verdict`는 `approve` 또는 `revise`만 사용합니다.
+            - `summary`, `missing_items`, `recommended_changes`를 모두 포함합니다.
 
             ## Handoff Instructions
-            아래 Context, Critic Skill, PM 산출물을 검토한 뒤 지정된 형식으로만 응답한다.
+            아래 Context, Critic Skill, PM 산출물을 검토한 뒤 지정한 형식으로만 응답합니다.
 
             ---
 

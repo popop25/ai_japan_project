@@ -1,24 +1,24 @@
-name: AI_Japan_project
-purpose: 일본 고객사 대상 AI 에이전트 도입 프로젝트의 업무 적용 가능성을 검증한다.
-customer: 일본 리테일 기업 (가상)
-current_stage: 킥오프 완료, 요구사항 정의 진행중
-active_work: PM 에이전트가 요구사항 정의서 초안을 작성할 준비 단계
+﻿name: AI_Japan_project
+purpose: 일본 고객사를 대상으로 AI 에이전트 업무 플랫폼의 실무 적용 가능성을 검증한다.
+customer: 일본 리테일 기업(가상)
+current_stage: 킥오프 완료, 요구사항 정의 진행 중
+active_work: PM 에이전트가 요구사항 정의서 초안을 작성할 수 있도록 맥락과 업무 흐름을 정리하는 단계
 last_updated: '2026-03-28'
 constraints:
-  technical: Claude Code / Codex 같은 외부 에이전트 handoff 방식 유지
-  schedule: 4주 PoC 안에 시연 가능한 데모 완성
-  other: 일본어 지원 필요, 비개발자도 브라우저에서 흐름을 이해할 수 있어야 함
+  technical: Claude Code와 Codex 같은 외부 에이전트 handoff 방식을 유지한다.
+  schedule: 4주 PoC 안에 시연 가능한 데모를 완성해야 한다.
+  other: 일본어 지원이 필요하고, 비개발자도 브라우저에서 흐름을 이해할 수 있어야 한다.
 next_actions:
-- 요구사항 정의서 초안 작성
-- Critic 리뷰 반영 프로세스 검증
-- 비개발자 시연용 UI 정리
+  - 요구사항 정의서 초안 작성
+  - Critic 리뷰 반영 프로세스 검증
+  - 비개발자 시연용 UI 정리
 decisions:
-- date: '2026-03-28'
-  decision: PM 에이전트를 첫 역할로 선정
-  reason: 임원급 청중과 비개발자에게 가장 이해하기 쉬운 산출물이기 때문
-- date: '2026-03-28'
-  decision: 로컬 파일 저장소를 v1 canonical source로 사용
-  reason: Atlassian 연동 이전에도 end-to-end 데모를 완성하기 위함
+  - date: '2026-03-28'
+    decision: PM 에이전트를 첫 역할로 선정
+    reason: 임원과 비개발자에게 가장 이해하기 쉬운 산출물이기 때문
+  - date: '2026-03-28'
+    decision: 로컬 파일 저장소를 v1 canonical source로 사용
+    reason: Atlassian 연동 이전에도 end-to-end 데모를 완성하기 위함
 references:
   jira: v2에서 Jira TaskStore로 교체 예정
   skills: project/skills/pm.md

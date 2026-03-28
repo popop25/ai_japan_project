@@ -14,3 +14,8 @@ project/runs/*
 .pytest_tmp/
 ai_japan_project_smoke_*/
 pytest-cache-files-*/
+
+streamlit.out.log
+streamlit.err.log
+
+.tmp_test_runs/

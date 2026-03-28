@@ -1,9 +1,11 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from datetime import datetime, timezone
 from pathlib import Path
 from uuid import uuid4
 
+from .handoff import LocalPromptHandoffService
+from .interfaces import ArtifactStore, ContextStore, PromptHandoffService, RunStore, TaskStore
 from .models import (
     Artifact,
     DashboardActivity,
@@ -19,20 +21,8 @@ from .models import (
     TaskEvent,
     WorkPacket,
 )
-from .renderers import (
-    render_context_markdown,
-    render_critic_packet,
-    render_pm_packet,
-    render_review_document,
-)
-from .storage import (
-    LocalArtifactStore,
-    LocalContextStore,
-    LocalRunStore,
-    LocalTaskStore,
-    ensure_runtime_dirs,
-    split_frontmatter,
-)
+from .renderers import render_context_markdown, render_review_document
+from .storage import LocalArtifactStore, LocalContextStore, LocalRunStore, LocalTaskStore, ensure_runtime_dirs, split_frontmatter
 
 
 def utc_now() -> str:
@@ -46,30 +36,44 @@ def make_id(prefix: str) -> str:
 class ProjectService:
     def __init__(
         self,
-        context_store: LocalContextStore | None = None,
-        task_store: LocalTaskStore | None = None,
-        artifact_store: LocalArtifactStore | None = None,
-        run_store: LocalRunStore | None = None,
+        context_store: ContextStore | None = None,
+        task_store: TaskStore | None = None,
+        artifact_store: ArtifactStore | None = None,
+        run_store: RunStore | None = None,
+        prompt_service: PromptHandoffService | None = None,
     ) -> None:
         ensure_runtime_dirs()
         self.context_store = context_store or LocalContextStore()
         self.task_store = task_store or LocalTaskStore()
         self.artifact_store = artifact_store or LocalArtifactStore()
         self.run_store = run_store or LocalRunStore()
+        self.prompt_service = prompt_service or LocalPromptHandoffService()
         self._bootstrap_context_markdown()
 
     @property
     def project_root(self) -> Path:
-        return self.context_store.yaml_path.parent
+        yaml_path = getattr(self.context_store, "yaml_path", None)
+        if yaml_path is not None:
+            return Path(yaml_path).parent
+        return Path.cwd() / "project"
 
     @property
     def repo_root(self) -> Path:
         return self.project_root.parent
 
     def _bootstrap_context_markdown(self) -> None:
-        if not self.context_store.markdown_path.exists():
-            context = self.context_store.load()
-            self.context_store.save(context, render_context_markdown(context))
+        load_markdown = getattr(self.context_store, "load_markdown", None)
+        markdown_path = getattr(self.context_store, "markdown_path", None)
+        if markdown_path is not None and Path(markdown_path).exists():
+            return
+        if callable(load_markdown):
+            try:
+                load_markdown()
+                return
+            except Exception:
+                pass
+        context = self.context_store.load()
+        self.context_store.save(context, render_context_markdown(context))
 
     def get_context(self) -> tuple[ProjectContext, str]:
         return self.context_store.load(), self.context_store.load_markdown()
@@ -102,7 +106,7 @@ class ProjectService:
                     timestamp=timestamp,
                     event_type="task_created",
                     actor="system",
-                    message="요구사항 정의서 작성을 위한 PM task가 생성되었습니다.",
+                    message="요구사항 정의서를 만들기 위한 PM 작업이 생성되었습니다.",
                     status=Status.PENDING,
                 )
             ],
@@ -129,11 +133,11 @@ class ProjectService:
     def dispatch_pm(self, task_id: str) -> TaskDetail:
         task = self._require_task(task_id)
         if task.status not in {Status.PENDING, Status.REVISION_NEEDED}:
-            raise ValueError("PM packet can only be generated from pending or revision_needed.")
+            raise ValueError("PM 프롬프트는 pending 또는 revision_needed 상태에서만 만들 수 있습니다.")
 
         _, context_markdown = self.get_context()
         skill_text = self._read_repo_text(task.refs["pm_skill"])
-        packet_content = render_pm_packet(task, context_markdown, skill_text)
+        packet_content = self.prompt_service.create_pm_packet(task, context_markdown, skill_text)
         packet_id = make_id("packet")
         packet_path = self.run_store.save_packet(f"{packet_id}.md", packet_content)
         timestamp = utc_now()
@@ -159,7 +163,7 @@ class ProjectService:
                         timestamp=timestamp,
                         event_type="pm_packet_generated",
                         actor="system",
-                        message="PM 에이전트용 work packet이 생성되었습니다.",
+                        message="PM 에이전트용 프롬프트를 생성했습니다.",
                         status=Status.IN_PROGRESS,
                     )
                 ],
@@ -171,7 +175,7 @@ class ProjectService:
     def ingest_pm(self, task_id: str, request: IngestPMRequest | str, title: str | None = None) -> TaskDetail:
         task = self._require_task(task_id)
         if task.status != Status.IN_PROGRESS:
-            raise ValueError("PM result can only be ingested while the task is in progress.")
+            raise ValueError("PM 결과는 진행 중 상태에서만 반영할 수 있습니다.")
 
         if isinstance(request, IngestPMRequest):
             content = request.content
@@ -180,7 +184,7 @@ class ProjectService:
             content = request
             artifact_title = title
         if not content.strip():
-            raise ValueError("PM result cannot be empty.")
+            raise ValueError("PM 결과는 비어 있을 수 없습니다.")
 
         timestamp = utc_now()
         latest_run = self._require_latest_run(task.id, "pm")
@@ -213,7 +217,7 @@ class ProjectService:
                         timestamp=timestamp,
                         event_type="pm_result_ingested",
                         actor="human",
-                        message="PM 에이전트 산출물이 업로드되었습니다.",
+                        message="PM 산출물을 반영했습니다.",
                         status=Status.IN_PROGRESS,
                     )
                 ],
@@ -227,7 +231,7 @@ class ProjectService:
         pm_artifact = self._require_latest_artifact(task, "pm_output")
         _, context_markdown = self.get_context()
         critic_skill = self._read_repo_text(task.refs["critic_skill"])
-        packet_content = render_critic_packet(task, context_markdown, critic_skill, pm_artifact.content)
+        packet_content = self.prompt_service.create_critic_packet(task, context_markdown, critic_skill, pm_artifact.content)
         packet_id = make_id("packet")
         packet_path = self.run_store.save_packet(f"{packet_id}.md", packet_content)
         timestamp = utc_now()
@@ -252,7 +256,7 @@ class ProjectService:
                         timestamp=timestamp,
                         event_type="critic_packet_generated",
                         actor="system",
-                        message="Critic 에이전트용 review packet이 생성되었습니다.",
+                        message="Critic 리뷰용 프롬프트를 생성했습니다.",
                         status=Status.IN_PROGRESS,
                     )
                 ],
@@ -268,22 +272,22 @@ class ProjectService:
         else:
             review_markdown = request
         if not review_markdown.strip():
-            raise ValueError("Critic review cannot be empty.")
+            raise ValueError("Critic 리뷰는 비어 있을 수 없습니다.")
 
         latest_run = self._require_latest_run(task.id, "critic")
         frontmatter, notes = split_frontmatter(review_markdown)
         if not frontmatter:
-            raise ValueError("Critic review must include YAML front matter.")
+            raise ValueError("Critic 리뷰에는 YAML front matter가 포함되어야 합니다.")
         verdict = frontmatter.get("verdict")
         if verdict not in {"approve", "revise"}:
-            raise ValueError("Critic verdict must be approve or revise.")
+            raise ValueError("Critic verdict는 approve 또는 revise 여야 합니다.")
 
         timestamp = utc_now()
         review = Review(
             id=make_id("review"),
             task_id=task.id,
             verdict=verdict,
-            summary=(frontmatter.get("summary") or "").strip() or "총평이 제공되지 않았습니다.",
+            summary=(frontmatter.get("summary") or "").strip() or "요약이 제공되지 않았습니다.",
             missing_items=list(frontmatter.get("missing_items") or []),
             recommended_changes=list(frontmatter.get("recommended_changes") or []),
             artifact_id="",
@@ -310,9 +314,9 @@ class ProjectService:
         )
         next_status = Status.REVIEW_REQUESTED if verdict == "approve" else Status.REVISION_NEEDED
         review_message = (
-            "Critic이 승인했습니다. 사람 검토 요청 단계로 이동합니다."
+            "Critic 승인 결과가 반영되었습니다. 리뷰 요청 단계로 이동합니다."
             if verdict == "approve"
-            else "Critic이 수정 필요를 반환했습니다. PM 재작업이 필요합니다."
+            else "Critic이 수정 필요 의견을 남겼습니다. PM 재작업이 필요합니다."
         )
         updated = task.model_copy(
             update={
@@ -401,14 +405,14 @@ class ProjectService:
                 task_id=run.task_id,
                 stage=run.stage,
                 agent_role="PM Agent" if run.stage == "pm" else "Critic Agent",
-                title=f"{run.stage.upper()} work packet",
+                title="PM 프롬프트" if run.stage == "pm" else "Critic 프롬프트",
                 created_at=run.created_at,
                 input_refs=[
                     "project/03_context.md",
                     "project/skills/pm.md" if run.stage == "pm" else "project/skills/critic.md",
                 ],
                 output_contract=[],
-                handoff_instructions="Copy this packet into Codex or Claude Code, then paste the result back into the app.",
+                handoff_instructions="이 프롬프트를 Codex 또는 Claude Code에 전달한 뒤, 결과를 앱에 다시 붙여넣으세요.",
                 content=self.run_store.load_packet(packet_path.name),
                 path=self._safe_display_path(packet_path),
             )
@@ -418,8 +422,11 @@ class ProjectService:
         for artifact in artifacts:
             if artifact.kind != "critic_review":
                 continue
-            raw_text = Path(artifact.path).read_text(encoding="utf-8")
-            frontmatter, _ = split_frontmatter(raw_text)
+            if artifact.content.strip().startswith("---"):
+                frontmatter, _ = split_frontmatter(artifact.content)
+            else:
+                raw_text = Path(artifact.path).read_text(encoding="utf-8") if Path(str(artifact.path)).exists() else artifact.content
+                frontmatter, _ = split_frontmatter(raw_text)
             if not frontmatter:
                 continue
             return Review(
