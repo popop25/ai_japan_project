@@ -1,0 +1,16 @@
+__pycache__/
+.pytest_cache/
+.venv/
+.mypy_cache/
+.streamlit/
+
+project/tasks/*.yaml
+project/artifacts/*.md
+project/runs/*
+
+!project/tasks/.gitkeep
+!project/artifacts/.gitkeep
+!project/runs/.gitkeep
+.pytest_tmp/
+ai_japan_project_smoke_*/
+pytest-cache-files-*/

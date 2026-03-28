@@ -1,0 +1,1 @@
+"""AI_Japan_project core package."""
