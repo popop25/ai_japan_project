@@ -1,8 +1,9 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import os
 from dataclasses import dataclass
 from enum import Enum
+from pathlib import Path
 from urllib.parse import urlparse
 
 from pydantic import BaseModel
@@ -128,18 +129,19 @@ class AppSettings(BaseModel):
     confluence_artifacts_parent_id: str | None = None
 
     @classmethod
-    def from_env(cls) -> "AppSettings":
-        raw_mode = _read_env("AJP_MODE") or AppMode.LOCAL.value
+    def from_env(cls, *, dotenv_path: Path | None = None) -> "AppSettings":
+        dotenv_values = _load_dotenv_values(dotenv_path)
+        raw_mode = _read_env("AJP_MODE", dotenv_values) or AppMode.LOCAL.value
         return cls(
             mode=AppMode(raw_mode),
-            atlassian_email=_read_env("ATLASSIAN_EMAIL"),
-            atlassian_api_token=_read_env("ATLASSIAN_API_TOKEN"),
-            jira_base_url=_normalize_base_url(_read_env("JIRA_BASE_URL")),
-            jira_project_key=_read_env("JIRA_PROJECT_KEY"),
-            confluence_base_url=_normalize_base_url(_read_env("CONFLUENCE_BASE_URL")),
-            confluence_space_key=_read_env("CONFLUENCE_SPACE_KEY"),
-            confluence_context_parent_id=_read_env("CONFLUENCE_CONTEXT_PARENT_ID"),
-            confluence_artifacts_parent_id=_read_env("CONFLUENCE_ARTIFACTS_PARENT_ID"),
+            atlassian_email=_read_env("ATLASSIAN_EMAIL", dotenv_values),
+            atlassian_api_token=_read_env("ATLASSIAN_API_TOKEN", dotenv_values),
+            jira_base_url=_normalize_base_url(_read_env("JIRA_BASE_URL", dotenv_values)),
+            jira_project_key=_read_env("JIRA_PROJECT_KEY", dotenv_values),
+            confluence_base_url=_normalize_base_url(_read_env("CONFLUENCE_BASE_URL", dotenv_values)),
+            confluence_space_key=_read_env("CONFLUENCE_SPACE_KEY", dotenv_values),
+            confluence_context_parent_id=_read_env("CONFLUENCE_CONTEXT_PARENT_ID", dotenv_values),
+            confluence_artifacts_parent_id=_read_env("CONFLUENCE_ARTIFACTS_PARENT_ID", dotenv_values),
         )
 
     def missing_atlassian_settings(self) -> list[str]:
@@ -183,12 +185,53 @@ class AppSettings(BaseModel):
         self.atlassian_settings()
 
 
-def _read_env(name: str) -> str | None:
+def _read_env(name: str, dotenv_values: dict[str, str] | None = None) -> str | None:
     value = os.getenv(name)
+    if value is None and dotenv_values is not None:
+        value = dotenv_values.get(name)
     if value is None:
         return None
     stripped = value.strip()
     return stripped or None
+
+
+def _load_dotenv_values(dotenv_path: Path | None = None) -> dict[str, str]:
+    path = dotenv_path or _default_dotenv_path()
+    if not path.exists():
+        return {}
+
+    values: dict[str, str] = {}
+    for line in path.read_text(encoding="utf-8").splitlines():
+        parsed = _parse_dotenv_line(line)
+        if parsed is None:
+            continue
+        key, value = parsed
+        values[key] = value
+    return values
+
+
+def _default_dotenv_path() -> Path:
+    return Path(__file__).resolve().parents[2] / ".env"
+
+
+def _parse_dotenv_line(line: str) -> tuple[str, str] | None:
+    stripped = line.strip()
+    if not stripped or stripped.startswith("#"):
+        return None
+    if stripped.startswith("export "):
+        stripped = stripped[len("export ") :].lstrip()
+    if "=" not in stripped:
+        return None
+
+    key, raw_value = stripped.split("=", 1)
+    key = key.strip()
+    if not key:
+        return None
+
+    value = raw_value.strip()
+    if value and value[0] == value[-1] and value[0] in {'"', "'"}:
+        value = value[1:-1]
+    return key, value
 
 
 def _normalize_base_url(value: str | None) -> str | None:

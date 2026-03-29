@@ -1,7 +1,8 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import io
 import json
+from pathlib import Path
 from urllib import error
 
 import pytest
@@ -22,6 +23,9 @@ from ai_japan_project.atlassian import (
 )
 from ai_japan_project.models import Status, Task, TaskEvent
 from ai_japan_project.settings import AppMode, AppSettings
+
+
+MISSING_DOTENV_PATH = Path('.tmp_test_runs') / 'missing.env'
 
 
 class FakeHTTPResponse:
@@ -319,14 +323,14 @@ def make_task(
 
 def test_app_settings_defaults_to_local(monkeypatch) -> None:
     monkeypatch.delenv("AJP_MODE", raising=False)
-    settings = AppSettings.from_env()
+    settings = AppSettings.from_env(dotenv_path=MISSING_DOTENV_PATH)
     assert settings.mode == AppMode.LOCAL
 
 
 def test_app_settings_reads_and_normalizes_atlassian_env(monkeypatch) -> None:
     _set_valid_atlassian_env(monkeypatch)
 
-    settings = AppSettings.from_env()
+    settings = AppSettings.from_env(dotenv_path=MISSING_DOTENV_PATH)
     resolved = settings.atlassian_settings()
 
     assert settings.mode == AppMode.ATLASSIAN
@@ -340,7 +344,7 @@ def test_app_settings_reports_missing_atlassian_values(monkeypatch) -> None:
     monkeypatch.setenv("AJP_MODE", "atlassian")
     monkeypatch.setenv("ATLASSIAN_EMAIL", "demo@example.com")
 
-    settings = AppSettings.from_env()
+    settings = AppSettings.from_env(dotenv_path=MISSING_DOTENV_PATH)
 
     with pytest.raises(ValueError, match="ATLASSIAN_API_TOKEN"):
         settings.validate_atlassian()
@@ -349,7 +353,7 @@ def test_app_settings_reports_missing_atlassian_values(monkeypatch) -> None:
 def test_app_settings_requires_confluence_wiki_root(monkeypatch) -> None:
     _set_valid_atlassian_env(monkeypatch, confluence_base_url="https://example.atlassian.net/")
 
-    settings = AppSettings.from_env()
+    settings = AppSettings.from_env(dotenv_path=MISSING_DOTENV_PATH)
 
     with pytest.raises(ValueError, match=r"CONFLUENCE_BASE_URL must match https://example\.atlassian\.net/wiki"):
         settings.validate_atlassian()
@@ -358,7 +362,7 @@ def test_app_settings_requires_confluence_wiki_root(monkeypatch) -> None:
 def test_app_settings_requires_numeric_confluence_parent_ids(monkeypatch) -> None:
     _set_valid_atlassian_env(monkeypatch, confluence_context_parent_id="ctx-root")
 
-    settings = AppSettings.from_env()
+    settings = AppSettings.from_env(dotenv_path=MISSING_DOTENV_PATH)
 
     with pytest.raises(ValueError, match="CONFLUENCE_CONTEXT_PARENT_ID must be a numeric Confluence page ID"):
         settings.validate_atlassian()
@@ -772,3 +776,4 @@ def test_atlassian_task_store_refuses_duplicate_creation_when_issue_check_has_ne
         store.save(task)
 
     assert client.issues == {}
+

@@ -1,4 +1,4 @@
-# AI_Japan_project
+﻿# AI_Japan_project
 
 `AI_Japan_project` is a local-first demo app for a Japan-market AI agent PoC. It shows how a PM, operations lead, or other non-developer can run an AI workflow in the browser, moving from project context to requirements drafting and quality review.
 
@@ -84,4 +84,5 @@ python -m streamlit run app_ui/streamlit_app.py
 cd D:\code\skax\AI_Japan_project
 pytest tests -q
 ```
+
 

@@ -1,6 +1,9 @@
-__pycache__/
+﻿__pycache__/
 .pytest_cache/
 .venv/
+.env
+.env.*
+.envrc
 .mypy_cache/
 .streamlit/
 
@@ -19,3 +22,5 @@ streamlit.out.log
 streamlit.err.log
 
 .tmp_test_runs/
+!.env.example
+
