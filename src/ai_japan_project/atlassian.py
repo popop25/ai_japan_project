@@ -1,9 +1,9 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import base64
 import json
 from html import escape, unescape
-from pathlib import Path
+from typing import TYPE_CHECKING, Callable, Protocol
 from urllib import error, parse, request
 
 from .interfaces import ArtifactStore, ContextStore, TaskStore
@@ -11,13 +11,49 @@ from .models import Artifact, ProjectContext, Status, Task
 from .renderers import render_context_markdown
 from .storage import LocalContextStore
 
+if TYPE_CHECKING:
+    from .settings import AtlassianSettings
+
 TASK_PROPERTY_KEY = "ai_japan_project.task"
 PAGE_META_PREFIX = "<!-- AJP_META:"
 PAGE_META_SUFFIX = "-->"
 JIRA_LABEL = "ai-japan-project"
 
 
+class AtlassianResponse(Protocol):
+    def __enter__(self) -> "AtlassianResponse": ...
+    def __exit__(self, exc_type, exc, tb) -> None: ...
+    def read(self) -> bytes: ...
+
+
+UrlOpenFn = Callable[..., AtlassianResponse]
+
+
+def build_basic_auth_header(email: str, api_token: str) -> str:
+    auth_pair = f"{email}:{api_token}".encode("utf-8")
+    return "Basic " + base64.b64encode(auth_pair).decode("ascii")
+
+
+def join_atlassian_url(base_url: str, path: str) -> str:
+    normalized_path = path if path.startswith("/") else f"/{path}"
+    return f"{base_url.rstrip('/')}" + normalized_path
+
+
 class AtlassianClient:
+    @classmethod
+    def from_settings(
+        cls,
+        settings: "AtlassianSettings",
+        opener: UrlOpenFn | None = None,
+    ) -> "AtlassianClient":
+        return cls(
+            email=settings.atlassian_email,
+            api_token=settings.atlassian_api_token,
+            jira_base_url=settings.jira_base_url,
+            confluence_base_url=settings.confluence_base_url,
+            opener=opener,
+        )
+
     def __init__(
         self,
         *,
@@ -25,11 +61,12 @@ class AtlassianClient:
         api_token: str,
         jira_base_url: str,
         confluence_base_url: str,
+        opener: UrlOpenFn | None = None,
     ) -> None:
-        auth_pair = f"{email}:{api_token}".encode("utf-8")
-        self.auth_header = "Basic " + base64.b64encode(auth_pair).decode("ascii")
+        self.auth_header = build_basic_auth_header(email, api_token)
         self.jira_base_url = jira_base_url.rstrip("/")
         self.confluence_base_url = confluence_base_url.rstrip("/")
+        self._opener = opener or request.urlopen
 
     def jira_json(self, method: str, path: str, payload: dict | None = None) -> dict:
         return self._json_request(self.jira_base_url, method, path, payload)
@@ -38,7 +75,8 @@ class AtlassianClient:
         return self._json_request(self.confluence_base_url, method, path, payload)
 
     def _json_request(self, base_url: str, method: str, path: str, payload: dict | None = None) -> dict:
-        url = f"{base_url}{path}"
+        normalized_method = method.upper()
+        url = join_atlassian_url(base_url, path)
         data = None
         headers = {
             "Authorization": self.auth_header,
@@ -47,14 +85,16 @@ class AtlassianClient:
         if payload is not None:
             data = json.dumps(payload).encode("utf-8")
             headers["Content-Type"] = "application/json"
-        req = request.Request(url, data=data, headers=headers, method=method.upper())
+        req = request.Request(url, data=data, headers=headers, method=normalized_method)
         try:
-            with request.urlopen(req, timeout=30) as response:
+            with self._opener(req, timeout=30) as response:
                 text = response.read().decode("utf-8")
                 return json.loads(text) if text else {}
         except error.HTTPError as exc:
             body = exc.read().decode("utf-8", errors="replace")
-            raise ValueError(f"Atlassian API error {exc.code} for {method} {path}: {body}") from exc
+            raise ValueError(
+                f"Atlassian API error {exc.code} for {normalized_method} {path}: {body}"
+            ) from exc
 
 
 def task_status_to_jira(status: Status) -> str:
@@ -104,7 +144,7 @@ def parse_page_metadata(storage_value: str) -> dict:
     end = storage_value.find(PAGE_META_SUFFIX)
     if end == -1:
         return {}
-    raw_json = storage_value[len(PAGE_META_PREFIX):end]
+    raw_json = storage_value[len(PAGE_META_PREFIX) : end]
     return json.loads(unescape(raw_json))
 
 
@@ -147,7 +187,7 @@ def markdown_to_storage(markdown: str) -> str:
 
 
 def page_url(base_url: str, page_id: str) -> str:
-    return f"{base_url}/pages/viewpage.action?pageId={page_id}"
+    return join_atlassian_url(base_url, f"/pages/viewpage.action?pageId={page_id}")
 
 
 def update_task_ref(task: Task, **refs: str) -> Task:
@@ -285,7 +325,7 @@ class AtlassianContextStore(ContextStore):
         if page is None:
             self.client.confluence_json(
                 "POST",
-                "/wiki/rest/api/content",
+                "/rest/api/content",
                 {
                     "type": "page",
                     "title": self.CONTEXT_TITLE,
@@ -297,7 +337,7 @@ class AtlassianContextStore(ContextStore):
         else:
             self.client.confluence_json(
                 "PUT",
-                f"/wiki/rest/api/content/{page['id']}",
+                f"/rest/api/content/{page['id']}",
                 {
                     "id": page["id"],
                     "type": "page",
@@ -312,7 +352,7 @@ class AtlassianContextStore(ContextStore):
         encoded_title = parse.quote(title)
         payload = self.client.confluence_json(
             "GET",
-            f"/wiki/rest/api/content?spaceKey={self.space_key}&title={encoded_title}&expand=body.storage,version",
+            f"/rest/api/content?spaceKey={self.space_key}&title={encoded_title}&expand=body.storage,version",
         )
         for result in payload.get("results", []):
             if result.get("title") == title:
@@ -329,7 +369,7 @@ class AtlassianArtifactStore(ArtifactStore):
     def list(self) -> list[Artifact]:
         payload = self.client.confluence_json(
             "GET",
-            f"/wiki/rest/api/content/{self.parent_page_id}/child/page?limit=200&expand=body.storage,version",
+            f"/rest/api/content/{self.parent_page_id}/child/page?limit=200&expand=body.storage,version",
         )
         artifacts: list[Artifact] = []
         for page in payload.get("results", []):
@@ -354,7 +394,7 @@ class AtlassianArtifactStore(ArtifactStore):
         if page is None:
             created = self.client.confluence_json(
                 "POST",
-                "/wiki/rest/api/content",
+                "/rest/api/content",
                 {
                     "type": "page",
                     "title": title,
@@ -363,10 +403,10 @@ class AtlassianArtifactStore(ArtifactStore):
                     "body": {"storage": {"value": body, "representation": "storage"}},
                 },
             )
-            return artifact.model_copy(update={"path": page_url(self.client.confluence_base_url, created["id"])} )
+            return artifact.model_copy(update={"path": page_url(self.client.confluence_base_url, created["id"])})
         self.client.confluence_json(
             "PUT",
-            f"/wiki/rest/api/content/{page['id']}",
+            f"/rest/api/content/{page['id']}",
             {
                 "id": page["id"],
                 "type": "page",
@@ -375,12 +415,12 @@ class AtlassianArtifactStore(ArtifactStore):
                 "body": {"storage": {"value": body, "representation": "storage"}},
             },
         )
-        return artifact.model_copy(update={"path": page_url(self.client.confluence_base_url, page["id"])} )
+        return artifact.model_copy(update={"path": page_url(self.client.confluence_base_url, page["id"])})
 
     def _find_page_by_artifact_id(self, artifact_id: str) -> dict | None:
         payload = self.client.confluence_json(
             "GET",
-            f"/wiki/rest/api/content/{self.parent_page_id}/child/page?limit=200&expand=body.storage,version",
+            f"/rest/api/content/{self.parent_page_id}/child/page?limit=200&expand=body.storage,version",
         )
         for page in payload.get("results", []):
             metadata = parse_page_metadata(page["body"]["storage"]["value"])
