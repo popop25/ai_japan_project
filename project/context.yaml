@@ -1,25 +1,28 @@
-﻿name: AI_Japan_project
-purpose: 일본 고객사를 대상으로 AI 에이전트 업무 플랫폼의 실무 적용 가능성을 검증한다.
-customer: 일본 리테일 기업(가상)
-current_stage: 킥오프 완료, 요구사항 정의 진행 중
-active_work: PM 에이전트가 요구사항 정의서 초안을 작성할 수 있도록 맥락과 업무 흐름을 정리하는 단계
-last_updated: '2026-03-28'
+name: AI_Japan_project
+purpose: 일본 고객사의 DX 조직이 비개발자 중심으로 AI 에이전트 업무 흐름을 운영할 수 있는지 검증하고, 첫 번째 적용 사례로 요구사항 정의서 작성과 리뷰 사이클을 시연한다.
+customer: 일본 전국 매장을 운영하는 리테일 기업의 DX 추진실 및 점포운영기획팀(가상)
+current_stage: 킥오프와 현업 인터뷰 정리를 마쳤고, 1차 데모용 요구사항 정의서를 준비하는 단계
+active_work: 매장 운영 문의 대응 업무를 예시로, PM 에이전트가 실무자가 바로 검토할 수 있는 요구사항 정의서 초안을 만들고 Critic이 품질 게이트 역할로 검토하는 흐름을 정리하고 있다.
+last_updated: '2026-03-29'
 constraints:
-  technical: Claude Code와 Codex 같은 외부 에이전트 handoff 방식을 유지한다.
-  schedule: 4주 PoC 안에 시연 가능한 데모를 완성해야 한다.
-  other: 일본어 지원이 필요하고, 비개발자도 브라우저에서 흐름을 이해할 수 있어야 한다.
+  technical: v1은 로컬 파일을 기준 저장소로 사용하되, 이후 Atlassian 연동으로 확장 가능한 external agent handoff 흐름을 유지해야 한다.
+  schedule: 4주 PoC 기간 안에 임원 시연과 현업 피드백 세션에 모두 사용할 수 있는 수준의 데모를 완성해야 한다.
+  other: 일본어 결과물을 기본으로 하고, 비개발자도 브라우저에서 현재 상태와 다음 액션을 바로 이해할 수 있어야 한다.
 next_actions:
-  - 요구사항 정의서 초안 작성
-  - Critic 리뷰 반영 프로세스 검증
-  - 비개발자 시연용 UI 정리
+  - PM 에이전트가 작성할 요구사항 정의서 초안의 범위와 성공 기준을 확정한다.
+  - Critic 리뷰 기준을 적용해 수정 필요 여부가 분명히 드러나는 품질 게이트 흐름을 검증한다.
+  - 시연자가 브라우저에서 컨텍스트 수정, 패킷 생성, 결과 반영까지 끊김 없이 보여줄 수 있도록 데모 동선을 다듬는다.
 decisions:
   - date: '2026-03-28'
-    decision: PM 에이전트를 첫 역할로 선정
-    reason: 임원과 비개발자에게 가장 이해하기 쉬운 산출물이기 때문
+    decision: 첫 데모 역할을 PM 에이전트로 고정
+    reason: 임원과 현업이 가장 빠르게 가치와 결과물을 이해할 수 있는 산출물이 요구사항 정의서이기 때문이다.
   - date: '2026-03-28'
-    decision: 로컬 파일 저장소를 v1 canonical source로 사용
-    reason: Atlassian 연동 이전에도 end-to-end 데모를 완성하기 위함
+    decision: v1 canonical source는 로컬 파일 저장소로 운영
+    reason: 외부 시스템 연동 전에 브라우저 기반 업무 흐름과 agent handoff 경험을 안정적으로 시연하기 위해서다.
+  - date: '2026-03-29'
+    decision: Critic은 형식 검수자가 아니라 PoC 범위와 사업 가치를 점검하는 품질 게이트로 정의
+    reason: 단순 승인보다 무엇이 빠졌는지 분명히 보여줘야 데모 메시지가 살아나기 때문이다.
 references:
-  jira: v2에서 Jira TaskStore로 교체 예정
+  jira: 현 단계는 local mode로 운영하고, v2에서 Jira TaskStore로 확장할 예정이다.
   skills: project/skills/pm.md
   notes: project/03_context.md

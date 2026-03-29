@@ -1,6 +1,6 @@
 # AI_Japan_project
 
-`AI_Japan_project` is a local-first demo app that shows how a non-developer can run an AI work platform in the browser.
+`AI_Japan_project` is a local-first demo app for a Japan-market AI agent PoC. It shows how a PM, operations lead, or other non-developer can run an AI workflow in the browser, moving from project context to requirements drafting and quality review.
 
 The product flow is:
 
@@ -11,6 +11,12 @@ The product flow is:
 5. Generate a Critic packet
 6. Paste the Critic review back into the app
 7. Track status, artifacts, and timeline in the UI
+
+## Demo Scenario
+
+- A Japanese retail company is evaluating whether business teams can operate AI-assisted workflows without waiting for a full internal tool build.
+- The first workflow focuses on a PM agent drafting a requirements document and a Critic agent acting as a quality gate before stakeholder review.
+- The demo is designed to highlight business clarity and operational control, not just model output.
 
 ## Stack
 
