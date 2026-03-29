@@ -626,15 +626,11 @@ class AtlassianContextStore(ContextStore):
     def load(self) -> ProjectContext:
         page = self._find_page(self.CONTEXT_TITLE)
         if page is None:
-            if self.bootstrap_store is None:
-                raise ValueError("Confluence context page not found and no bootstrap store was provided.")
-            context = self.bootstrap_store.load()
-            self.save(context, self.bootstrap_store.load_markdown())
-            return context
+            return self._bootstrap_context_page()
         metadata = parse_page_metadata(_page_storage_value(page))
         context_payload = metadata.get("context")
         if not context_payload:
-            raise ValueError("Confluence context page is missing canonical context metadata.")
+            return self._bootstrap_context_page()
         try:
             return ProjectContext.model_validate(context_payload)
         except ValidationError as exc:
@@ -643,7 +639,7 @@ class AtlassianContextStore(ContextStore):
     def load_markdown(self) -> str:
         page = self._find_page(self.CONTEXT_TITLE)
         if page is None:
-            return render_context_markdown(self.load())
+            return self._bootstrap_context_markdown()
         metadata = parse_page_metadata(_page_storage_value(page))
         stored_markdown = metadata.get("markdown")
         if isinstance(stored_markdown, str) and stored_markdown.strip():
@@ -651,7 +647,7 @@ class AtlassianContextStore(ContextStore):
         context_payload = metadata.get("context")
         if context_payload:
             return render_context_markdown(ProjectContext.model_validate(context_payload))
-        return render_context_markdown(self.load())
+        return self._bootstrap_context_markdown()
 
     def save(self, context: ProjectContext, markdown: str | None = None) -> ProjectContext:
         markdown = markdown or render_context_markdown(context)
@@ -686,6 +682,17 @@ class AtlassianContextStore(ContextStore):
             if not metadata or metadata.get("page_kind") in {None, "context"}:
                 return result
         return None
+
+    def _bootstrap_context_page(self) -> ProjectContext:
+        if self.bootstrap_store is None:
+            raise ValueError("Confluence context page not found and no bootstrap store was provided.")
+        context = self.bootstrap_store.load()
+        self.save(context, self.bootstrap_store.load_markdown())
+        return context
+
+    def _bootstrap_context_markdown(self) -> str:
+        context = self._bootstrap_context_page()
+        return render_context_markdown(context)
 
 
 class AtlassianArtifactStore(ArtifactStore):

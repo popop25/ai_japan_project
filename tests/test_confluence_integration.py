@@ -268,3 +268,62 @@ Please refine the acceptance criteria.
     assert detail.review.verdict == 'revise'
     assert detail.artifacts[0].content == artifact.content
 
+
+
+def test_atlassian_context_store_reuses_existing_plain_page_as_bootstrap_target() -> None:
+    project_dir = make_test_root() / 'project'
+    project_dir.mkdir(parents=True, exist_ok=True)
+    local_context = LocalContextStore(
+        yaml_path=project_dir / 'context.yaml',
+        markdown_path=project_dir / '03_context.md',
+    )
+    context = ProjectContext(
+        name='Bootstrap Project',
+        purpose='Upgrade plain Confluence page into canonical context page',
+        customer='Test Customer',
+        current_stage='bootstrap',
+        active_work='context migration',
+        last_updated='2026-03-29',
+        constraints=Constraints(
+            technical='existing page without metadata',
+            schedule='today',
+            other='safe overwrite of canonical target',
+        ),
+        next_actions=['save canonical metadata'],
+        decisions=[],
+        references=References(
+            jira='KAN-1',
+            skills='project/skills/pm.md',
+            notes='project/03_context.md',
+        ),
+    )
+    local_context.save(context, '# Bootstrap Context\n\n- canonical markdown\n')
+    client = FakeConfluenceClient()
+    client.pages['98309'] = {
+        'id': '98309',
+        'type': 'page',
+        'title': '03_Context',
+        'space': {'key': 'DEMO'},
+        'ancestors': [{'id': '100'}],
+        'body': {'storage': {'value': '<h1>03_Context</h1><p>legacy plain page</p>'}},
+        'version': {'number': 1},
+    }
+    store = AtlassianContextStore(
+        client,
+        space_key='DEMO',
+        parent_page_id='100',
+        bootstrap_store=local_context,
+    )
+
+    loaded = store.load()
+    loaded_markdown = store.load_markdown()
+
+    assert loaded.name == 'Bootstrap Project'
+    assert loaded_markdown.startswith('# Bootstrap Context')
+    upgraded_page = client.pages['98309']
+    metadata = parse_page_metadata(upgraded_page['body']['storage']['value'])
+    assert upgraded_page['version']['number'] == 2
+    assert metadata['context']['name'] == 'Bootstrap Project'
+    assert metadata['markdown'].startswith('# Bootstrap Context')
+
+
