@@ -6,6 +6,7 @@ from .atlassian import (
     AtlassianArtifactStore,
     AtlassianClient,
     AtlassianContextStore,
+    AtlassianServiceClient,
     AtlassianTaskStore,
 )
 from .handoff import LocalPromptHandoffService
@@ -13,7 +14,7 @@ from .service import ProjectService
 from .settings import AppMode, AppSettings, AtlassianSettings
 from .storage import LocalArtifactStore, LocalContextStore, LocalRunStore, LocalTaskStore
 
-AtlassianClientFactory = Callable[[AtlassianSettings], AtlassianClient]
+AtlassianClientFactory = Callable[[AtlassianSettings], AtlassianServiceClient]
 
 
 def build_project_service(
@@ -56,7 +57,7 @@ def _build_local_project_service(
 
 def _build_atlassian_project_service(
     *,
-    client: AtlassianClient,
+    client: AtlassianServiceClient,
     atlassian_settings: AtlassianSettings,
     prompt_service: LocalPromptHandoffService,
     run_store: LocalRunStore,

@@ -8,15 +8,18 @@ import pytest
 
 import ai_japan_project.factory as factory_module
 from ai_japan_project.atlassian import (
+    JIRA_LABEL,
     PAGE_META_PREFIX,
     PAGE_META_SUFFIX,
+    TASK_PROPERTY_KEY,
     AtlassianClient,
+    AtlassianTaskStore,
     build_basic_auth_header,
     build_page_body,
     parse_page_metadata,
     task_status_to_jira,
 )
-from ai_japan_project.models import Status
+from ai_japan_project.models import Status, Task, TaskEvent
 from ai_japan_project.settings import AppMode, AppSettings
 
 
@@ -32,6 +35,213 @@ class FakeHTTPResponse:
 
     def read(self) -> bytes:
         return json.dumps(self.payload).encode("utf-8")
+
+
+class RawHTTPResponse(FakeHTTPResponse):
+    def __init__(self, raw: bytes) -> None:
+        self.raw = raw
+
+    def read(self) -> bytes:
+        return self.raw
+
+
+class FakeJiraClient:
+    jira_base_url = "https://example.atlassian.net"
+
+    def __init__(self, project_key: str = "AJP") -> None:
+        self.project_key = project_key
+        self._next_issue_number = 1
+        self.issues: dict[str, dict] = {}
+
+    def issue(self, issue_key: str) -> dict:
+        return self.issues[issue_key]
+
+    def seed_task_issue(
+        self,
+        task: Task,
+        *,
+        issue_key: str | None = None,
+        jira_status: str = "To Do",
+        status_category: str = "new",
+        workflow: dict[str, list[dict]] | None = None,
+    ) -> str:
+        issue_key = issue_key or self._next_issue_key()
+        self.issues[issue_key] = {
+            "key": issue_key,
+            "fields": {
+                "summary": task.title,
+                "description": None,
+                "labels": [JIRA_LABEL],
+            },
+            "status_name": jira_status,
+            "status_category": status_category,
+            "properties": {TASK_PROPERTY_KEY: task.model_dump(mode="json")},
+            "comments": [],
+            "workflow": workflow or self._default_workflow(),
+        }
+        return issue_key
+
+    def jira_json(self, method: str, path: str, payload: dict | None = None) -> dict:
+        method = method.upper()
+        payload = payload or {}
+
+        if method == "GET" and path.startswith("/rest/api/3/search?"):
+            return {
+                "issues": [
+                    {
+                        "key": issue["key"],
+                        "fields": {
+                            "summary": issue["fields"]["summary"],
+                            "status": self._status_payload(issue),
+                        },
+                    }
+                    for issue in self.issues.values()
+                    if JIRA_LABEL in issue["fields"]["labels"]
+                ]
+            }
+
+        if method == "POST" and path == "/rest/api/3/issue":
+            issue_key = self._next_issue_key()
+            fields = payload["fields"]
+            self.issues[issue_key] = {
+                "key": issue_key,
+                "fields": {
+                    "summary": fields["summary"],
+                    "description": fields.get("description"),
+                    "labels": list(fields.get("labels") or []),
+                },
+                "status_name": "To Do",
+                "status_category": "new",
+                "properties": {},
+                "comments": [],
+                "workflow": self._default_workflow(),
+            }
+            return {"key": issue_key}
+
+        if path.startswith("/rest/api/3/issue/"):
+            issue_key, suffix = self._split_issue_path(path)
+            issue = self.issues.get(issue_key)
+            if issue is None:
+                raise ValueError(f"Issue not found: {issue_key}")
+
+            if method == "PUT" and suffix == "":
+                fields = payload["fields"]
+                issue["fields"]["summary"] = fields["summary"]
+                issue["fields"]["description"] = fields["description"]
+                return {}
+
+            if method == "GET" and suffix == "?fields=status":
+                return {"fields": {"status": self._status_payload(issue)}}
+
+            if suffix.startswith("/properties/"):
+                property_key = suffix.split("/properties/", 1)[1]
+                if method == "PUT":
+                    issue["properties"][property_key] = payload
+                    return {}
+                if method == "GET":
+                    if property_key not in issue["properties"]:
+                        raise ValueError(f"Property not found: {property_key}")
+                    return {"value": issue["properties"][property_key]}
+
+            if suffix == "/transitions":
+                if method == "GET":
+                    return {"transitions": list(issue["workflow"].get(issue["status_name"], []))}
+                if method == "POST":
+                    transition_id = payload["transition"]["id"]
+                    for transition in issue["workflow"].get(issue["status_name"], []):
+                        if transition["id"] != transition_id:
+                            continue
+                        issue["status_name"] = transition["to"]["name"]
+                        issue["status_category"] = transition["to"]["statusCategory"]["key"]
+                        return {}
+                    raise ValueError(f"Transition not found: {transition_id}")
+
+            if method == "POST" and suffix == "/comment":
+                issue["comments"].append(self._extract_adf_text(payload["body"]))
+                return {"id": str(len(issue["comments"]))}
+
+        raise AssertionError(f"Unexpected Jira request: {method} {path}")
+
+    def description_text(self, issue_key: str) -> str:
+        return self._extract_adf_text(self.issue(issue_key)["fields"]["description"])
+
+    def _next_issue_key(self) -> str:
+        issue_key = f"{self.project_key}-{self._next_issue_number}"
+        self._next_issue_number += 1
+        return issue_key
+
+    def _split_issue_path(self, path: str) -> tuple[str, str]:
+        remainder = path[len("/rest/api/3/issue/") :]
+        if "/" in remainder:
+            issue_key, suffix = remainder.split("/", 1)
+            return issue_key, f"/{suffix}"
+        if "?" in remainder:
+            issue_key, suffix = remainder.split("?", 1)
+            return issue_key, f"?{suffix}"
+        return remainder, ""
+
+    def _status_payload(self, issue: dict) -> dict:
+        return {
+            "name": issue["status_name"],
+            "statusCategory": {"key": issue["status_category"]},
+        }
+
+    def _default_workflow(self) -> dict[str, list[dict]]:
+        return {
+            "To Do": [self._transition("11", "In Progress", "indeterminate")],
+            "Backlog": [self._transition("12", "In Progress", "indeterminate")],
+            "Selected for Development": [self._transition("13", "In Progress", "indeterminate")],
+            "In Progress": [
+                self._transition("21", "In Review", "indeterminate"),
+                self._transition("22", "Done", "done"),
+            ],
+            "Doing": [
+                self._transition("31", "In Review", "indeterminate"),
+                self._transition("32", "Done", "done"),
+            ],
+            "Development": [
+                self._transition("41", "In Review", "indeterminate"),
+                self._transition("42", "Done", "done"),
+            ],
+            "In Review": [
+                self._transition("51", "In Progress", "indeterminate"),
+                self._transition("52", "Done", "done"),
+            ],
+            "Review": [
+                self._transition("61", "In Progress", "indeterminate"),
+                self._transition("62", "Done", "done"),
+            ],
+            "Ready for Review": [
+                self._transition("71", "Done", "done"),
+                self._transition("72", "In Progress", "indeterminate"),
+            ],
+            "QA Review": [
+                self._transition("81", "Done", "done"),
+                self._transition("82", "In Progress", "indeterminate"),
+            ],
+            "Done": [],
+            "Closed": [],
+            "Resolved": [],
+        }
+
+    def _transition(self, transition_id: str, to_name: str, category_key: str) -> dict:
+        return {
+            "id": transition_id,
+            "to": {
+                "name": to_name,
+                "statusCategory": {"key": category_key},
+            },
+        }
+
+    def _extract_adf_text(self, document: dict | None) -> str:
+        if not document:
+            return ""
+        lines: list[str] = []
+        for block in document.get("content", []):
+            text = "".join(node.get("text", "") for node in block.get("content", []))
+            if text:
+                lines.append(text)
+        return "\n".join(lines)
 
 
 def _set_valid_atlassian_env(
@@ -50,6 +260,44 @@ def _set_valid_atlassian_env(
     monkeypatch.setenv("CONFLUENCE_SPACE_KEY", "DEMO")
     monkeypatch.setenv("CONFLUENCE_CONTEXT_PARENT_ID", confluence_context_parent_id)
     monkeypatch.setenv("CONFLUENCE_ARTIFACTS_PARENT_ID", confluence_artifacts_parent_id)
+
+
+def make_task(
+    *,
+    task_id: str = "task_123",
+    title: str = "Requirements Draft Task",
+    status: Status = Status.PENDING,
+    updated_at: str = "2026-03-29T00:00:00Z",
+    refs: dict[str, str] | None = None,
+    artifact_ids: list[str] | None = None,
+    history: list[TaskEvent] | None = None,
+) -> Task:
+    return Task(
+        id=task_id,
+        title=title,
+        role="pm",
+        deliverable="requirements_draft",
+        status=status,
+        refs={
+            "context": "project/03_context.md",
+            "pm_skill": "project/skills/pm.md",
+            "critic_skill": "project/skills/critic.md",
+            **(refs or {}),
+        },
+        artifact_ids=artifact_ids or [],
+        created_at="2026-03-29T00:00:00Z",
+        updated_at=updated_at,
+        history=history
+        or [
+            TaskEvent(
+                timestamp="2026-03-29T00:00:00Z",
+                event_type="task_created",
+                actor="system",
+                message="Requirements draft task created.",
+                status=status,
+            )
+        ],
+    )
 
 
 def test_app_settings_defaults_to_local(monkeypatch) -> None:
@@ -254,6 +502,19 @@ def test_atlassian_client_surfaces_http_errors_with_method_and_path() -> None:
         client.jira_json("GET", "/rest/api/3/myself")
 
 
+def test_atlassian_client_surfaces_invalid_json_payloads() -> None:
+    client = AtlassianClient(
+        email="demo@example.com",
+        api_token="token",
+        jira_base_url="https://example.atlassian.net",
+        confluence_base_url="https://example.atlassian.net/wiki",
+        opener=lambda req, timeout=30: RawHTTPResponse(b"not-json"),
+    )
+
+    with pytest.raises(ValueError, match=r"returned invalid JSON"):
+        client.jira_json("GET", "/rest/api/3/myself")
+
+
 def test_task_status_to_jira_mapping() -> None:
     assert task_status_to_jira(Status.PENDING) == "To Do"
     assert task_status_to_jira(Status.IN_PROGRESS) == "In Progress"
@@ -272,3 +533,153 @@ def test_build_page_body_round_trip_metadata() -> None:
     assert "<h2>Heading</h2>" in body
     assert "<li>one</li>" in body
     assert parse_page_metadata(body) == metadata
+
+
+def test_atlassian_task_store_creates_issue_and_saves_property_refs_and_comment() -> None:
+    client = FakeJiraClient()
+    store = AtlassianTaskStore(client, project_key="AJP")
+    task = make_task(artifact_ids=["artifact_001"])
+
+    saved = store.save(task)
+
+    assert saved.refs["jira_issue_key"] == "AJP-1"
+    assert saved.refs["jira_issue_url"] == "https://example.atlassian.net/browse/AJP-1"
+    issue = client.issue("AJP-1")
+    assert issue["properties"][TASK_PROPERTY_KEY]["id"] == task.id
+    assert issue["properties"][TASK_PROPERTY_KEY]["artifact_ids"] == ["artifact_001"]
+    assert issue["comments"] == ["Requirements draft task created."]
+    assert "Task ID: task_123" in client.description_text("AJP-1")
+    assert "Artifact IDs: artifact_001" in client.description_text("AJP-1")
+
+
+def test_atlassian_task_store_reuses_existing_issue_when_task_ref_is_missing() -> None:
+    client = FakeJiraClient()
+    original = make_task(task_id="task_existing")
+    issue_key = client.seed_task_issue(original)
+    store = AtlassianTaskStore(client, project_key="AJP")
+    updated = original.model_copy(
+        update={
+            "title": "Updated Requirements Draft",
+            "updated_at": "2026-03-29T01:00:00Z",
+            "history": original.history
+            + [
+                TaskEvent(
+                    timestamp="2026-03-29T01:00:00Z",
+                    event_type="task_updated",
+                    actor="system",
+                    message="Task title updated.",
+                    status=Status.PENDING,
+                )
+            ],
+        }
+    )
+
+    saved = store.save(updated)
+
+    assert len(client.issues) == 1
+    assert saved.refs["jira_issue_key"] == issue_key
+    assert client.issue(issue_key)["fields"]["summary"] == "Updated Requirements Draft"
+    assert client.issue(issue_key)["comments"][-1] == "Task title updated."
+
+
+def test_atlassian_task_store_maps_revision_needed_to_in_progress_with_comment() -> None:
+    previous = make_task(task_id="task_revision", status=Status.IN_PROGRESS)
+    client = FakeJiraClient()
+    issue_key = client.seed_task_issue(previous, jira_status="In Progress", status_category="indeterminate")
+    store = AtlassianTaskStore(client, project_key="AJP")
+    revised = previous.model_copy(
+        update={
+            "status": Status.REVISION_NEEDED,
+            "updated_at": "2026-03-29T02:00:00Z",
+            "history": previous.history
+            + [
+                TaskEvent(
+                    timestamp="2026-03-29T02:00:00Z",
+                    event_type="critic_review_ingested",
+                    actor="human",
+                    message="Revision requested by critic.",
+                    status=Status.REVISION_NEEDED,
+                )
+            ],
+        }
+    )
+
+    store.save(revised)
+
+    issue = client.issue(issue_key)
+    assert issue["status_name"] == "In Progress"
+    assert issue["properties"][TASK_PROPERTY_KEY]["status"] == "revision_needed"
+    assert "revision_needed" in issue["comments"][-1]
+    assert "In Progress" in issue["comments"][-1]
+
+
+def test_atlassian_task_store_uses_status_category_fallback_for_custom_workflow() -> None:
+    previous = make_task(task_id="task_review", status=Status.IN_PROGRESS)
+    client = FakeJiraClient()
+    workflow = {
+        "Development": [client._transition("41", "Done", "done")],
+        "Done": [],
+    }
+    issue_key = client.seed_task_issue(
+        previous,
+        jira_status="Development",
+        status_category="indeterminate",
+        workflow=workflow,
+    )
+    store = AtlassianTaskStore(client, project_key="AJP")
+    ready_for_review = previous.model_copy(
+        update={
+            "status": Status.REVIEW_REQUESTED,
+            "updated_at": "2026-03-29T03:00:00Z",
+            "history": previous.history
+            + [
+                TaskEvent(
+                    timestamp="2026-03-29T03:00:00Z",
+                    event_type="critic_review_ingested",
+                    actor="human",
+                    message="Review requested.",
+                    status=Status.REVIEW_REQUESTED,
+                )
+            ],
+        }
+    )
+
+    store.save(ready_for_review)
+
+    issue = client.issue(issue_key)
+    assert issue["status_name"] == "Development"
+    assert issue["properties"][TASK_PROPERTY_KEY]["status"] == "review_requested"
+    assert "Development" in issue["comments"][-1]
+    assert "issue property" in issue["comments"][-1]
+
+
+def test_atlassian_task_store_surfaces_available_transitions_when_sync_fails() -> None:
+    previous = make_task(task_id="task_done_blocked")
+    client = FakeJiraClient()
+    workflow = {
+        "To Do": [client._transition("11", "In Progress", "indeterminate")],
+        "In Progress": [],
+    }
+    issue_key = client.seed_task_issue(previous, jira_status="To Do", status_category="new", workflow=workflow)
+    store = AtlassianTaskStore(client, project_key="AJP")
+    done_task = previous.model_copy(
+        update={
+            "status": Status.DONE,
+            "updated_at": "2026-03-29T04:00:00Z",
+            "history": previous.history
+            + [
+                TaskEvent(
+                    timestamp="2026-03-29T04:00:00Z",
+                    event_type="task_completed",
+                    actor="system",
+                    message="Task completed.",
+                    status=Status.DONE,
+                )
+            ],
+        }
+    )
+
+    with pytest.raises(ValueError, match=r"Available transitions: In Progress"):
+        store.save(done_task)
+
+    assert client.issue(issue_key)["properties"][TASK_PROPERTY_KEY]["status"] == "done"

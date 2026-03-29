@@ -83,3 +83,4 @@ python -m streamlit run app_ui/streamlit_app.py
 cd D:\code\skax\AI_Japan_project
 pytest tests -q
 ```
+
