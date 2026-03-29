@@ -12,6 +12,7 @@ from ai_japan_project.atlassian import (
     PAGE_META_PREFIX,
     PAGE_META_SUFFIX,
     TASK_PROPERTY_KEY,
+    AtlassianApiError,
     AtlassianClient,
     AtlassianTaskStore,
     build_basic_auth_header,
@@ -52,9 +53,13 @@ class FakeJiraClient:
         self.project_key = project_key
         self._next_issue_number = 1
         self.issues: dict[str, dict] = {}
+        self.issue_status_errors: dict[str, Exception] = {}
 
     def issue(self, issue_key: str) -> dict:
         return self.issues[issue_key]
+
+    def set_issue_status_error(self, issue_key: str, exc: Exception) -> None:
+        self.issue_status_errors[issue_key] = exc
 
     def seed_task_issue(
         self,
@@ -120,9 +125,16 @@ class FakeJiraClient:
 
         if path.startswith("/rest/api/3/issue/"):
             issue_key, suffix = self._split_issue_path(path)
+            if method == "GET" and suffix == "?fields=status" and issue_key in self.issue_status_errors:
+                raise self.issue_status_errors[issue_key]
             issue = self.issues.get(issue_key)
             if issue is None:
-                raise ValueError(f"Issue not found: {issue_key}")
+                raise AtlassianApiError(
+                    f"Atlassian API error 404 for {method} {path}: Issue {issue_key} not found",
+                    method=method,
+                    path=path,
+                    status_code=404,
+                )
 
             if method == "PUT" and suffix == "":
                 fields = payload["fields"]
@@ -140,7 +152,12 @@ class FakeJiraClient:
                     return {}
                 if method == "GET":
                     if property_key not in issue["properties"]:
-                        raise ValueError(f"Property not found: {property_key}")
+                        raise AtlassianApiError(
+                            f"Atlassian API error 404 for {method} {path}: Property {property_key} not found on {issue_key}",
+                            method=method,
+                            path=path,
+                            status_code=404,
+                        )
                     return {"value": issue["properties"][property_key]}
 
             if suffix == "/transitions":
@@ -683,3 +700,75 @@ def test_atlassian_task_store_surfaces_available_transitions_when_sync_fails() -
         store.save(done_task)
 
     assert client.issue(issue_key)["properties"][TASK_PROPERTY_KEY]["status"] == "done"
+
+
+def test_atlassian_task_store_recreates_issue_when_issue_ref_returns_404() -> None:
+    client = FakeJiraClient()
+    store = AtlassianTaskStore(client, project_key="AJP")
+    task = make_task(refs={"jira_issue_key": "AJP-404"})
+
+    saved = store.save(task)
+
+    assert saved.refs["jira_issue_key"] == "AJP-1"
+    assert len(client.issues) == 1
+
+
+def test_atlassian_task_store_refuses_duplicate_creation_when_issue_check_is_unauthorized() -> None:
+    client = FakeJiraClient()
+    client.set_issue_status_error(
+        "AJP-401",
+        AtlassianApiError(
+            "Atlassian API error 401 for GET /rest/api/3/issue/AJP-401?fields=status: Unauthorized",
+            method="GET",
+            path="/rest/api/3/issue/AJP-401?fields=status",
+            status_code=401,
+        ),
+    )
+    store = AtlassianTaskStore(client, project_key="AJP")
+    task = make_task(refs={"jira_issue_key": "AJP-401"})
+
+    with pytest.raises(ValueError, match=r"Refusing to create a new Jira issue.*401"):
+        store.save(task)
+
+    assert client.issues == {}
+
+
+def test_atlassian_task_store_refuses_duplicate_creation_when_issue_check_is_retryable() -> None:
+    client = FakeJiraClient()
+    client.set_issue_status_error(
+        "AJP-429",
+        AtlassianApiError(
+            "Atlassian API error 429 for GET /rest/api/3/issue/AJP-429?fields=status: Too Many Requests",
+            method="GET",
+            path="/rest/api/3/issue/AJP-429?fields=status",
+            status_code=429,
+            retryable=True,
+        ),
+    )
+    store = AtlassianTaskStore(client, project_key="AJP")
+    task = make_task(refs={"jira_issue_key": "AJP-429"})
+
+    with pytest.raises(ValueError, match=r"Refusing to create a new Jira issue.*429"):
+        store.save(task)
+
+    assert client.issues == {}
+
+
+def test_atlassian_task_store_refuses_duplicate_creation_when_issue_check_has_network_error() -> None:
+    client = FakeJiraClient()
+    client.set_issue_status_error(
+        "AJP-NET",
+        AtlassianApiError(
+            "Atlassian API request failed for GET /rest/api/3/issue/AJP-NET?fields=status: timed out",
+            method="GET",
+            path="/rest/api/3/issue/AJP-NET?fields=status",
+            retryable=True,
+        ),
+    )
+    store = AtlassianTaskStore(client, project_key="AJP")
+    task = make_task(refs={"jira_issue_key": "AJP-NET"})
+
+    with pytest.raises(ValueError, match=r"Refusing to create a new Jira issue.*timed out"):
+        store.save(task)
+
+    assert client.issues == {}

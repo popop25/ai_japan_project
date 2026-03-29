@@ -61,6 +61,7 @@ Validation that happens without live network calls:
 - Confluence parent IDs are checked to be numeric page IDs.
 - `factory.build_project_service(..., atlassian_client_factory=...)` can be exercised with a fake client factory.
 - `AtlassianClient(..., opener=...)` can be exercised with a fake opener to verify auth headers, URLs, payloads, and HTTP error handling.
+- Jira issue existence checks fail closed: only a clear 404 is treated as missing, while auth, rate-limit, server, and network errors stop sync before a duplicate issue is created.
 
 What is still not covered in this repo:
 

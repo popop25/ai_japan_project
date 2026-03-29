@@ -29,6 +29,23 @@ class AtlassianResponse(Protocol):
     def read(self) -> bytes: ...
 
 
+class AtlassianApiError(ValueError):
+    def __init__(
+        self,
+        message: str,
+        *,
+        method: str,
+        path: str,
+        status_code: int | None = None,
+        retryable: bool = False,
+    ) -> None:
+        super().__init__(message)
+        self.method = method
+        self.path = path
+        self.status_code = status_code
+        self.retryable = retryable
+
+
 class JiraApiClient(Protocol):
     jira_base_url: str
 
@@ -139,17 +156,26 @@ class AtlassianClient:
                 try:
                     return json.loads(text)
                 except json.JSONDecodeError as exc:
-                    raise ValueError(
-                        f"Atlassian API returned invalid JSON for {normalized_method} {path}: {text[:200]}"
+                    raise AtlassianApiError(
+                        f"Atlassian API returned invalid JSON for {normalized_method} {path}: {text[:200]}",
+                        method=normalized_method,
+                        path=path,
                     ) from exc
         except error.HTTPError as exc:
             body = exc.read().decode("utf-8", errors="replace")
-            raise ValueError(
-                f"Atlassian API error {exc.code} for {normalized_method} {path}: {body}"
+            raise AtlassianApiError(
+                f"Atlassian API error {exc.code} for {normalized_method} {path}: {body}",
+                method=normalized_method,
+                path=path,
+                status_code=exc.code,
+                retryable=exc.code in {429, 500, 502, 503, 504},
             ) from exc
         except error.URLError as exc:
-            raise ValueError(
-                f"Atlassian API request failed for {normalized_method} {path}: {exc.reason}"
+            raise AtlassianApiError(
+                f"Atlassian API request failed for {normalized_method} {path}: {exc.reason}",
+                method=normalized_method,
+                path=path,
+                retryable=True,
             ) from exc
 
 
@@ -334,8 +360,12 @@ class AtlassianTaskStore(TaskStore):
         try:
             payload = self.client.jira_json("GET", f"/rest/api/3/issue/{issue_key}/properties/{TASK_PROPERTY_KEY}")
             task = Task.model_validate(payload.get("value") or {})
-        except (ValueError, ValidationError):
+        except ValidationError:
             return None
+        except ValueError as exc:
+            if _is_not_found_error(exc):
+                return None
+            raise
         return self._sync_remote_refs(task, issue_key)
 
     def _load_previous_task(self, task: Task) -> Task | None:
@@ -350,23 +380,36 @@ class AtlassianTaskStore(TaskStore):
         try:
             payload = self.client.jira_json("GET", f"/rest/api/3/issue/{issue_key}/properties/{TASK_PROPERTY_KEY}")
             task = Task.model_validate(payload.get("value") or {})
-        except (ValueError, ValidationError):
+        except ValidationError:
             return None
+        except ValueError as exc:
+            if _is_not_found_error(exc):
+                return None
+            raise
         return self._sync_remote_refs(task, issue_key)
 
     def _resolve_issue_key(self, task: Task, previous_task: Task | None) -> str | None:
         if previous_task is not None:
             return previous_task.refs.get("jira_issue_key") or task.refs.get("jira_issue_key")
         issue_key = task.refs.get("jira_issue_key")
-        if issue_key and self._issue_exists(issue_key):
-            return issue_key
+        if not issue_key:
+            return None
+        try:
+            if self._issue_exists(issue_key):
+                return issue_key
+        except ValueError as exc:
+            raise ValueError(
+                f"Could not verify whether Jira issue {issue_key} still exists. Refusing to create a new Jira issue for task {task.id} until this check succeeds: {exc}"
+            ) from exc
         return None
 
     def _issue_exists(self, issue_key: str) -> bool:
         try:
             self._issue_status(issue_key)
-        except ValueError:
-            return False
+        except ValueError as exc:
+            if _is_not_found_error(exc):
+                return False
+            raise
         return True
 
     def _sync_remote_refs(self, task: Task, issue_key: str) -> Task:
@@ -637,6 +680,13 @@ def _latest_event_key(task: Task) -> str | None:
     return f"{latest.timestamp}:{latest.event_type}:{latest.message}"
 
 
+def _is_not_found_error(exc: ValueError) -> bool:
+    if isinstance(exc, AtlassianApiError):
+        return exc.status_code == 404
+    message = str(exc).casefold()
+    return "api error 404" in message or message.startswith("issue not found:") or message.startswith("property not found:")
+
+
 def _matches_status(value: str, candidates: tuple[str, ...]) -> bool:
     normalized_value = _normalize_status_name(value)
     return any(normalized_value == _normalize_status_name(candidate) for candidate in candidates)
@@ -681,3 +731,4 @@ def _dedupe_notes(notes: list[str]) -> str:
         if note not in unique_notes:
             unique_notes.append(note)
     return " ".join(unique_notes)
+
