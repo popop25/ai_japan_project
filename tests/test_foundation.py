@@ -94,7 +94,7 @@ class FakeJiraClient:
         method = method.upper()
         payload = payload or {}
 
-        if method == "GET" and path.startswith("/rest/api/3/search?"):
+        if (method == "GET" and path.startswith("/rest/api/3/search?")) or (method == "POST" and path == "/rest/api/3/search/jql"):
             return {
                 "issues": [
                     {
@@ -544,6 +544,45 @@ def test_task_status_to_jira_mapping() -> None:
     assert task_status_to_jira(Status.DONE) == "Done"
 
 
+def test_atlassian_task_store_accepts_korean_status_aliases() -> None:
+    client = FakeJiraClient(project_key="KAN")
+    previous = make_task(task_id="task_korean_alias", status=Status.PENDING)
+    issue_key = client.seed_task_issue(previous, jira_status="해야 할 일", status_category="new")
+    issue = client.issue(issue_key)
+    issue["workflow"] = {
+        "해야 할 일": [
+            client._transition("101", "진행 중", "indeterminate"),
+            client._transition("102", "완료", "done"),
+        ],
+        "진행 중": [client._transition("201", "완료", "done")],
+        "완료": [],
+    }
+    store = AtlassianTaskStore(client, project_key="KAN")
+
+    updated = previous.model_copy(
+        update={
+            "status": Status.IN_PROGRESS,
+            "updated_at": "2026-03-29T03:00:00Z",
+            "history": previous.history
+            + [
+                TaskEvent(
+                    timestamp="2026-03-29T03:00:00Z",
+                    event_type="pm_dispatched",
+                    actor="system",
+                    message="PM packet generated.",
+                    status=Status.IN_PROGRESS,
+                )
+            ],
+        }
+    )
+
+    saved = store.save(updated)
+
+    assert saved.refs["jira_issue_key"] == issue_key
+    assert issue["status_name"] == "진행 중"
+    assert issue["comments"][-1] == "PM packet generated."
+
+
 def test_build_page_body_round_trip_metadata() -> None:
     metadata = {"artifact": {"id": "artifact_123", "task_id": "task_123"}}
     body = build_page_body("Demo Page", metadata, "# Heading\n\n- one")
@@ -776,4 +815,5 @@ def test_atlassian_task_store_refuses_duplicate_creation_when_issue_check_has_ne
         store.save(task)
 
     assert client.issues == {}
+
 

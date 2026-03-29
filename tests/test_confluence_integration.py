@@ -5,8 +5,10 @@ from urllib.parse import parse_qs, urlparse
 from uuid import uuid4
 
 from ai_japan_project.atlassian import (
+    AtlassianApiError,
     AtlassianArtifactStore,
     AtlassianContextStore,
+    CONFLUENCE_META_PROPERTY_KEY,
     build_page_body,
     page_url,
     parse_page_metadata,
@@ -29,6 +31,7 @@ class FakeConfluenceClient:
     def __init__(self, *, confluence_base_url: str = 'https://example.atlassian.net/wiki') -> None:
         self.confluence_base_url = confluence_base_url.rstrip('/')
         self.pages: dict[str, dict] = {}
+        self.properties: dict[tuple[str, str], dict] = {}
         self._next_page_id = 1000
 
     def confluence_json(self, method: str, path: str, payload: dict | None = None) -> dict:
@@ -50,6 +53,32 @@ class FakeConfluenceClient:
             }
             self.pages[page_id] = page
             return self._page_response(page)
+
+        if method == 'POST' and route.startswith('/rest/api/content/') and route.endswith('/property'):
+            page_id = route.split('/')[4]
+            key = payload['key']
+            prop = {'key': key, 'value': payload['value'], 'version': {'number': 1}}
+            self.properties[(page_id, key)] = prop
+            return self._property_response(prop)
+
+        if route.startswith('/rest/api/content/') and '/property/' in route:
+            page_id = route.split('/')[4]
+            key = route.split('/')[6]
+            prop_key = (page_id, key)
+            if method == 'GET':
+                if prop_key not in self.properties:
+                    raise AtlassianApiError(
+                        f'Atlassian API error 404 for {method} {path}: Property {key} not found on page {page_id}',
+                        method=method,
+                        path=path,
+                        status_code=404,
+                    )
+                return self._property_response(self.properties[prop_key])
+            if method == 'PUT':
+                prop = self.properties[prop_key]
+                prop['value'] = payload['value']
+                prop['version'] = {'number': payload['version']['number']}
+                return self._property_response(prop)
 
         if method == 'PUT' and route.startswith('/rest/api/content/'):
             page_id = route.split('/')[4]
@@ -85,6 +114,13 @@ class FakeConfluenceClient:
             'ancestors': [dict(item) for item in page.get('ancestors', [])],
             'body': {'storage': {'value': page['body']['storage']['value']}},
             'version': {'number': page['version']['number']},
+        }
+
+    def _property_response(self, prop: dict) -> dict:
+        return {
+            'key': prop['key'],
+            'value': prop['value'],
+            'version': {'number': prop['version']['number']},
         }
 
 
@@ -154,6 +190,55 @@ def test_atlassian_context_store_bootstraps_and_preserves_markdown() -> None:
     assert saved_metadata['markdown'] == updated_markdown
 
 
+def test_atlassian_context_store_reads_metadata_from_content_property_when_storage_comments_are_stripped() -> None:
+    project_dir = make_test_root() / 'project'
+    project_dir.mkdir(parents=True, exist_ok=True)
+    local_context = LocalContextStore(
+        yaml_path=project_dir / 'context.yaml',
+        markdown_path=project_dir / '03_context.md',
+    )
+    context = ProjectContext(
+        name='Property Context',
+        purpose='Read canonical context from Confluence content properties',
+        customer='Test Customer',
+        current_stage='property fallback',
+        active_work='recover stripped metadata',
+        last_updated='2026-03-29',
+        constraints=Constraints(
+            technical='storage comments removed',
+            schedule='today',
+            other='content property fallback',
+        ),
+        next_actions=['verify property-backed load'],
+        decisions=[],
+        references=References(
+            jira='KAN-1',
+            skills='project/skills/pm.md',
+            notes='project/03_context.md',
+        ),
+    )
+    markdown = '# Property Context\n\n- property-backed markdown\n'
+    local_context.save(context, markdown)
+    client = FakeConfluenceClient()
+    store = AtlassianContextStore(
+        client,
+        space_key='DEMO',
+        parent_page_id='100',
+        bootstrap_store=local_context,
+    )
+
+    store.save(context, markdown)
+    page = next(iter(client.pages.values()))
+    page['body']['storage']['value'] = '<h1>03_Context</h1><p>sanitized</p>'
+
+    loaded = store.load()
+    loaded_markdown = store.load_markdown()
+
+    assert loaded.name == 'Property Context'
+    assert loaded_markdown == markdown
+    assert client.properties[(page['id'], CONFLUENCE_META_PROPERTY_KEY)]['value']['context']['name'] == 'Property Context'
+
+
 def test_atlassian_artifact_store_round_trips_page_url_and_metadata() -> None:
     client = FakeConfluenceClient()
     store = AtlassianArtifactStore(client, space_key='DEMO', parent_page_id='200')
@@ -192,6 +277,34 @@ def test_atlassian_artifact_store_round_trips_page_url_and_metadata() -> None:
     assert updated_page['version']['number'] == 3
     assert updated_metadata['artifact']['title'] == 'Requirements Draft v2'
     assert updated_metadata['artifact']['path'] == saved.path
+
+
+def test_atlassian_artifact_store_reads_metadata_from_content_property_when_storage_comments_are_stripped() -> None:
+    client = FakeConfluenceClient()
+    store = AtlassianArtifactStore(client, space_key='DEMO', parent_page_id='200')
+
+    saved = store.save(
+        Artifact(
+            id='artifact_property_001',
+            task_id='task_property_001',
+            kind='pm_output',
+            title='Property-backed Draft',
+            created_at='2026-03-29T00:00:00Z',
+            path='',
+            content='# Property Heading\n\n- canonical property metadata\n',
+        )
+    )
+
+    page = next(iter(client.pages.values()))
+    page['body']['storage']['value'] = '<h1>Property-backed Draft</h1><p>sanitized</p>'
+
+    loaded = store.get(saved.id)
+    listed = store.list()
+
+    assert loaded is not None
+    assert loaded.id == saved.id
+    assert listed[0].id == saved.id
+    assert client.properties[(page['id'], CONFLUENCE_META_PROPERTY_KEY)]['value']['artifact']['id'] == saved.id
 
 
 def test_project_service_keeps_remote_review_frontmatter_for_viewer() -> None:

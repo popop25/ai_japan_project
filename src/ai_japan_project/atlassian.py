@@ -23,6 +23,7 @@ PAGE_META_SUFFIX = "-->"
 JIRA_LABEL = "ai-japan-project"
 CONFLUENCE_PAGE_BATCH_SIZE = 100
 PAGE_META_SCHEMA_VERSION = 1
+CONFLUENCE_META_PROPERTY_KEY = "ai_japan_project.meta"
 
 
 class AtlassianResponse(Protocol):
@@ -85,11 +86,11 @@ class JiraStatusSyncResult:
 
 
 JIRA_STATUS_TARGETS: dict[Status, JiraStatusTarget] = {
-    Status.PENDING: JiraStatusTarget("To Do", "new", ("Backlog", "Selected for Development")),
-    Status.IN_PROGRESS: JiraStatusTarget("In Progress", "indeterminate", ("Doing", "Development")),
-    Status.REVISION_NEEDED: JiraStatusTarget("In Progress", "indeterminate", ("Doing", "Development")),
-    Status.REVIEW_REQUESTED: JiraStatusTarget("In Review", "indeterminate", ("Review", "Ready for Review", "QA Review")),
-    Status.DONE: JiraStatusTarget("Done", "done", ("Closed", "Resolved")),
+    Status.PENDING: JiraStatusTarget("To Do", "new", ("Backlog", "Selected for Development", "해야 할 일")),
+    Status.IN_PROGRESS: JiraStatusTarget("In Progress", "indeterminate", ("Doing", "Development", "진행 중")),
+    Status.REVISION_NEEDED: JiraStatusTarget("In Progress", "indeterminate", ("Doing", "Development", "진행 중")),
+    Status.REVIEW_REQUESTED: JiraStatusTarget("In Review", "indeterminate", ("Review", "Ready for Review", "QA Review", "검토 중", "리뷰 중")),
+    Status.DONE: JiraStatusTarget("Done", "done", ("Closed", "Resolved", "완료")),
 }
 
 
@@ -400,12 +401,13 @@ class AtlassianTaskStore(TaskStore):
             issue_label = issue_key or task.refs.get("jira_issue_key") or "[new issue]"
             raise ValueError(f"Failed to sync Jira issue {issue_label} for task {task.id}: {exc}") from exc
 
-    def _search_path(self) -> str:
-        jql = parse.quote(f'project = "{self.project_key}" AND labels = "{JIRA_LABEL}" ORDER BY updated DESC')
-        return f"/rest/api/3/search?jql={jql}&maxResults=100&fields=summary,status"
-
     def _search_issues(self) -> list[dict]:
-        return self.client.jira_json("GET", self._search_path()).get("issues", [])
+        payload = {
+            "jql": f'project = "{self.project_key}" AND labels = "{JIRA_LABEL}" ORDER BY updated DESC',
+            "maxResults": 100,
+            "fields": ["summary", "status"],
+        }
+        return self.client.jira_json("POST", "/rest/api/3/search/jql", payload).get("issues", [])
 
     def _create_issue(self, task: Task) -> str:
         payload = {
@@ -627,7 +629,7 @@ class AtlassianContextStore(ContextStore):
         page = self._find_page(self.CONTEXT_TITLE)
         if page is None:
             return self._bootstrap_context_page()
-        metadata = parse_page_metadata(_page_storage_value(page))
+        metadata = _page_metadata(self.client, page)
         context_payload = metadata.get("context")
         if not context_payload:
             return self._bootstrap_context_page()
@@ -640,7 +642,7 @@ class AtlassianContextStore(ContextStore):
         page = self._find_page(self.CONTEXT_TITLE)
         if page is None:
             return self._bootstrap_context_markdown()
-        metadata = parse_page_metadata(_page_storage_value(page))
+        metadata = _page_metadata(self.client, page)
         stored_markdown = metadata.get("markdown")
         if isinstance(stored_markdown, str) and stored_markdown.strip():
             return stored_markdown if stored_markdown.endswith("\n") else stored_markdown + "\n"
@@ -651,34 +653,34 @@ class AtlassianContextStore(ContextStore):
 
     def save(self, context: ProjectContext, markdown: str | None = None) -> ProjectContext:
         markdown = markdown or render_context_markdown(context)
-        body = build_page_body(
-            self.CONTEXT_TITLE,
-            {
-                "schema_version": PAGE_META_SCHEMA_VERSION,
-                "page_kind": "context",
-                "context": context.model_dump(mode="json"),
-                "markdown": markdown,
-            },
-            markdown,
-        )
+        metadata = {
+            "schema_version": PAGE_META_SCHEMA_VERSION,
+            "page_kind": "context",
+            "context": context.model_dump(mode="json"),
+            "markdown": markdown,
+        }
+        body = build_page_body(self.CONTEXT_TITLE, metadata, markdown)
         page = self._find_page(self.CONTEXT_TITLE)
         if page is None:
-            _create_page(
+            created = _create_page(
                 self.client,
                 space_key=self.space_key,
                 parent_page_id=self.parent_page_id,
                 title=self.CONTEXT_TITLE,
                 body=body,
             )
+            page = created if created.get("version") else _get_page(self.client, created["id"])
         else:
-            _update_page(self.client, page=page, title=self.CONTEXT_TITLE, body=body)
+            updated = _update_page(self.client, page=page, title=self.CONTEXT_TITLE, body=body)
+            page = updated if updated.get("version") else _get_page(self.client, page["id"])
+        _upsert_page_metadata_property(self.client, page["id"], metadata)
         return context
 
     def _find_page(self, title: str) -> dict | None:
         for result in _list_child_pages(self.client, self.parent_page_id):
             if result.get("title") != title:
                 continue
-            metadata = parse_page_metadata(_page_storage_value(result))
+            metadata = _page_metadata(self.client, result)
             if not metadata or metadata.get("page_kind") in {None, "context"}:
                 return result
         return None
@@ -738,36 +740,35 @@ class AtlassianArtifactStore(ArtifactStore):
 
         stored_path = page_url(self.client.confluence_base_url, page["id"])
         stored_artifact = artifact.model_copy(update={"path": stored_path})
-        body = build_page_body(
-            title,
-            {
-                "schema_version": PAGE_META_SCHEMA_VERSION,
-                "page_kind": "artifact",
-                "artifact": stored_artifact.model_dump(mode="json"),
-                "page": {
-                    "id": page["id"],
-                    "url": stored_path,
-                    "space_key": self.space_key,
-                    "parent_page_id": self.parent_page_id,
-                    "title": title,
-                },
+        metadata = {
+            "schema_version": PAGE_META_SCHEMA_VERSION,
+            "page_kind": "artifact",
+            "artifact": stored_artifact.model_dump(mode="json"),
+            "page": {
+                "id": page["id"],
+                "url": stored_path,
+                "space_key": self.space_key,
+                "parent_page_id": self.parent_page_id,
+                "title": title,
             },
-            render_artifact_page_markdown(stored_artifact),
-        )
+        }
+        body = build_page_body(title, metadata, render_artifact_page_markdown(stored_artifact))
         if _page_storage_value(page) != body or page.get("title") != title:
-            _update_page(self.client, page=page, title=title, body=body)
+            updated = _update_page(self.client, page=page, title=title, body=body)
+            page = updated if updated.get("version") else _get_page(self.client, page["id"])
+        _upsert_page_metadata_property(self.client, page["id"], metadata)
         return stored_artifact
 
     def _find_page_by_artifact_id(self, artifact_id: str) -> dict | None:
         for page in _list_child_pages(self.client, self.parent_page_id):
-            metadata = parse_page_metadata(_page_storage_value(page))
+            metadata = _page_metadata(self.client, page)
             artifact_payload = metadata.get("artifact") or {}
             if artifact_payload.get("id") == artifact_id:
                 return page
         return None
 
     def _artifact_from_page(self, page: dict) -> Artifact | None:
-        metadata = parse_page_metadata(_page_storage_value(page))
+        metadata = _page_metadata(self.client, page)
         artifact_payload = metadata.get("artifact")
         if not artifact_payload:
             return None
@@ -785,7 +786,7 @@ class AtlassianArtifactStore(ArtifactStore):
             except ValueError:
                 page = None
             if page is not None:
-                metadata = parse_page_metadata(_page_storage_value(page))
+                metadata = _page_metadata(self.client, page)
                 artifact_payload = metadata.get("artifact") or {}
                 if artifact_payload.get("id") == artifact.id:
                     return page
@@ -794,6 +795,52 @@ class AtlassianArtifactStore(ArtifactStore):
 
 def _page_storage_value(page: dict) -> str:
     return str(page.get("body", {}).get("storage", {}).get("value") or "")
+
+
+def _page_metadata(client: ConfluenceApiClient, page: dict) -> dict:
+    metadata = parse_page_metadata(_page_storage_value(page))
+    if metadata:
+        return metadata
+    page_id = str(page.get("id") or "")
+    if not page_id:
+        return {}
+    return _load_page_metadata_property(client, page_id)
+
+
+def _load_page_metadata_property(client: ConfluenceApiClient, page_id: str) -> dict:
+    try:
+        payload = client.confluence_json("GET", f"/rest/api/content/{page_id}/property/{CONFLUENCE_META_PROPERTY_KEY}")
+    except ValueError as exc:
+        if _is_not_found_error(exc):
+            return {}
+        raise
+    value = payload.get("value")
+    return value if isinstance(value, dict) else {}
+
+
+def _upsert_page_metadata_property(client: ConfluenceApiClient, page_id: str, metadata: dict) -> None:
+    property_path = f"/rest/api/content/{page_id}/property/{CONFLUENCE_META_PROPERTY_KEY}"
+    try:
+        existing = client.confluence_json("GET", property_path)
+    except ValueError as exc:
+        if not _is_not_found_error(exc):
+            raise
+        client.confluence_json(
+            "POST",
+            f"/rest/api/content/{page_id}/property",
+            {"key": CONFLUENCE_META_PROPERTY_KEY, "value": metadata},
+        )
+        return
+    version_number = int(existing.get("version", {}).get("number") or 1)
+    client.confluence_json(
+        "PUT",
+        property_path,
+        {
+            "key": CONFLUENCE_META_PROPERTY_KEY,
+            "value": metadata,
+            "version": {"number": version_number + 1},
+        },
+    )
 
 
 def _page_id_from_artifact_path(path: str) -> str | None:
@@ -906,7 +953,7 @@ def _transition_names(transitions: list[dict]) -> list[str]:
 def _status_sync_note(status: Status, jira_status_name: str) -> str | None:
     if status != Status.REVISION_NEEDED:
         return None
-    if _matches_status(jira_status_name, ("In Progress", "Doing", "Development")):
+    if _matches_status(jira_status_name, ("In Progress", "Doing", "Development", "진행 중")):
         return 'Internal status revision_needed is represented in Jira as "In Progress".'
     return (
         f'Internal status revision_needed was stored in the issue property, and Jira status '
@@ -929,3 +976,6 @@ def _dedupe_notes(notes: list[str]) -> str:
         if note not in unique_notes:
             unique_notes.append(note)
     return " ".join(unique_notes)
+
+
+
