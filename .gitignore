@@ -24,3 +24,4 @@ streamlit.err.log
 .tmp_test_runs/
 !.env.example
 
+.tmp_test_foundation/

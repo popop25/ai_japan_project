@@ -422,11 +422,7 @@ class ProjectService:
         for artifact in artifacts:
             if artifact.kind != "critic_review":
                 continue
-            if artifact.content.strip().startswith("---"):
-                frontmatter, _ = split_frontmatter(artifact.content)
-            else:
-                raw_text = Path(artifact.path).read_text(encoding="utf-8") if Path(str(artifact.path)).exists() else artifact.content
-                frontmatter, _ = split_frontmatter(raw_text)
+            frontmatter, _ = split_frontmatter(self._artifact_source_document(artifact))
             if not frontmatter:
                 continue
             return Review(
@@ -440,6 +436,17 @@ class ProjectService:
                 created_at=artifact.created_at,
             )
         return None
+
+    def _artifact_source_document(self, artifact: Artifact) -> str:
+        if artifact.content.strip().startswith("---"):
+            return artifact.content
+        path = str(artifact.path)
+        if "://" in path:
+            return artifact.content
+        artifact_path = Path(path)
+        if artifact_path.exists():
+            return artifact_path.read_text(encoding="utf-8")
+        return artifact.content
 
     def _read_repo_text(self, relative_path: str) -> str:
         return (self.repo_root / relative_path).read_text(encoding="utf-8")

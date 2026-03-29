@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import base64
 import json
@@ -11,7 +11,7 @@ from pydantic import ValidationError
 
 from .interfaces import ArtifactStore, ContextStore, TaskStore
 from .models import Artifact, ProjectContext, Status, Task
-from .renderers import render_context_markdown
+from .renderers import render_artifact_page_markdown, render_context_markdown
 from .storage import LocalContextStore
 
 if TYPE_CHECKING:
@@ -21,6 +21,8 @@ TASK_PROPERTY_KEY = "ai_japan_project.task"
 PAGE_META_PREFIX = "<!-- AJP_META:"
 PAGE_META_SUFFIX = "-->"
 JIRA_LABEL = "ai-japan-project"
+CONFLUENCE_PAGE_BATCH_SIZE = 100
+PAGE_META_SCHEMA_VERSION = 1
 
 
 class AtlassianResponse(Protocol):
@@ -226,50 +228,124 @@ def build_page_body(title: str, metadata: dict, markdown_body: str) -> str:
 
 
 def parse_page_metadata(storage_value: str) -> dict:
-    if not storage_value.startswith(PAGE_META_PREFIX):
+    start = storage_value.find(PAGE_META_PREFIX)
+    if start == -1:
         return {}
-    end = storage_value.find(PAGE_META_SUFFIX)
+    end = storage_value.find(PAGE_META_SUFFIX, start)
     if end == -1:
         return {}
-    raw_json = storage_value[len(PAGE_META_PREFIX) : end]
-    return json.loads(unescape(raw_json))
+    raw_json = storage_value[start + len(PAGE_META_PREFIX) : end]
+    try:
+        payload = json.loads(unescape(raw_json))
+    except json.JSONDecodeError:
+        return {}
+    return payload if isinstance(payload, dict) else {}
 
 
 def markdown_to_storage(markdown: str) -> str:
     blocks: list[str] = []
-    lines = markdown.splitlines()
-    in_list = False
-    for raw_line in lines:
+    paragraph_lines: list[str] = []
+    list_items: list[str] = []
+    list_tag: str | None = None
+    code_lines: list[str] = []
+    in_code_block = False
+
+    def flush_paragraph() -> None:
+        if not paragraph_lines:
+            return
+        blocks.append(f"<p>{escape(' '.join(paragraph_lines))}</p>")
+        paragraph_lines.clear()
+
+    def flush_list() -> None:
+        nonlocal list_tag
+        if not list_tag:
+            return
+        blocks.append(f"<{list_tag}>")
+        blocks.extend(list_items)
+        blocks.append(f"</{list_tag}>")
+        list_items.clear()
+        list_tag = None
+
+    def flush_code_block() -> None:
+        nonlocal in_code_block
+        if not code_lines:
+            in_code_block = False
+            return
+        code_text = "\n".join(code_lines)
+        blocks.append(f"<pre><code>{escape(code_text)}</code></pre>")
+        code_lines.clear()
+        in_code_block = False
+
+    for raw_line in markdown.splitlines():
         line = raw_line.rstrip()
-        if not line:
-            if in_list:
-                blocks.append("</ul>")
-                in_list = False
+        stripped = line.strip()
+
+        if in_code_block:
+            if stripped.startswith("```"):
+                flush_code_block()
+            else:
+                code_lines.append(raw_line)
             continue
-        if line.startswith("# "):
-            if in_list:
-                blocks.append("</ul>")
-                in_list = False
-            blocks.append(f"<h2>{escape(line[2:])}</h2>")
+
+        if stripped.startswith("```"):
+            flush_paragraph()
+            flush_list()
+            in_code_block = True
+            code_lines.clear()
             continue
-        if line.startswith("## "):
-            if in_list:
-                blocks.append("</ul>")
-                in_list = False
-            blocks.append(f"<h3>{escape(line[3:])}</h3>")
+
+        if not stripped:
+            flush_paragraph()
+            flush_list()
             continue
-        if line.startswith("- "):
-            if not in_list:
-                blocks.append("<ul>")
-                in_list = True
-            blocks.append(f"<li>{escape(line[2:])}</li>")
+
+        if stripped == "---":
+            flush_paragraph()
+            flush_list()
+            blocks.append("<hr />")
             continue
-        if in_list:
-            blocks.append("</ul>")
-            in_list = False
-        blocks.append(f"<p>{escape(line)}</p>")
-    if in_list:
-        blocks.append("</ul>")
+
+        if stripped.startswith("# "):
+            flush_paragraph()
+            flush_list()
+            blocks.append(f"<h2>{escape(stripped[2:])}</h2>")
+            continue
+
+        if stripped.startswith("## "):
+            flush_paragraph()
+            flush_list()
+            blocks.append(f"<h3>{escape(stripped[3:])}</h3>")
+            continue
+
+        if stripped.startswith("### "):
+            flush_paragraph()
+            flush_list()
+            blocks.append(f"<h4>{escape(stripped[4:])}</h4>")
+            continue
+
+        if stripped.startswith("- "):
+            flush_paragraph()
+            if list_tag not in {None, "ul"}:
+                flush_list()
+            list_tag = "ul"
+            list_items.append(f"<li>{escape(stripped[2:])}</li>")
+            continue
+
+        ordered_marker, separator, ordered_value = stripped.partition(". ")
+        if separator and ordered_marker.isdigit():
+            flush_paragraph()
+            if list_tag not in {None, "ol"}:
+                flush_list()
+            list_tag = "ol"
+            list_items.append(f"<li>{escape(ordered_value)}</li>")
+            continue
+
+        flush_list()
+        paragraph_lines.append(stripped)
+
+    flush_paragraph()
+    flush_list()
+    flush_code_block()
     return "".join(blocks)
 
 
@@ -553,52 +629,61 @@ class AtlassianContextStore(ContextStore):
             if self.bootstrap_store is None:
                 raise ValueError("Confluence context page not found and no bootstrap store was provided.")
             context = self.bootstrap_store.load()
-            self.save(context, render_context_markdown(context))
+            self.save(context, self.bootstrap_store.load_markdown())
             return context
-        metadata = parse_page_metadata(page["body"]["storage"]["value"])
-        return ProjectContext.model_validate(metadata["context"])
+        metadata = parse_page_metadata(_page_storage_value(page))
+        context_payload = metadata.get("context")
+        if not context_payload:
+            raise ValueError("Confluence context page is missing canonical context metadata.")
+        try:
+            return ProjectContext.model_validate(context_payload)
+        except ValidationError as exc:
+            raise ValueError("Confluence context page contains invalid canonical context metadata.") from exc
 
     def load_markdown(self) -> str:
+        page = self._find_page(self.CONTEXT_TITLE)
+        if page is None:
+            return render_context_markdown(self.load())
+        metadata = parse_page_metadata(_page_storage_value(page))
+        stored_markdown = metadata.get("markdown")
+        if isinstance(stored_markdown, str) and stored_markdown.strip():
+            return stored_markdown if stored_markdown.endswith("\n") else stored_markdown + "\n"
+        context_payload = metadata.get("context")
+        if context_payload:
+            return render_context_markdown(ProjectContext.model_validate(context_payload))
         return render_context_markdown(self.load())
 
     def save(self, context: ProjectContext, markdown: str | None = None) -> ProjectContext:
         markdown = markdown or render_context_markdown(context)
-        body = build_page_body(self.CONTEXT_TITLE, {"context": context.model_dump(mode="json")}, markdown)
+        body = build_page_body(
+            self.CONTEXT_TITLE,
+            {
+                "schema_version": PAGE_META_SCHEMA_VERSION,
+                "page_kind": "context",
+                "context": context.model_dump(mode="json"),
+                "markdown": markdown,
+            },
+            markdown,
+        )
         page = self._find_page(self.CONTEXT_TITLE)
         if page is None:
-            self.client.confluence_json(
-                "POST",
-                "/rest/api/content",
-                {
-                    "type": "page",
-                    "title": self.CONTEXT_TITLE,
-                    "space": {"key": self.space_key},
-                    "ancestors": [{"id": self.parent_page_id}],
-                    "body": {"storage": {"value": body, "representation": "storage"}},
-                },
+            _create_page(
+                self.client,
+                space_key=self.space_key,
+                parent_page_id=self.parent_page_id,
+                title=self.CONTEXT_TITLE,
+                body=body,
             )
         else:
-            self.client.confluence_json(
-                "PUT",
-                f"/rest/api/content/{page['id']}",
-                {
-                    "id": page["id"],
-                    "type": "page",
-                    "title": self.CONTEXT_TITLE,
-                    "version": {"number": page["version"]["number"] + 1},
-                    "body": {"storage": {"value": body, "representation": "storage"}},
-                },
-            )
+            _update_page(self.client, page=page, title=self.CONTEXT_TITLE, body=body)
         return context
 
     def _find_page(self, title: str) -> dict | None:
-        encoded_title = parse.quote(title)
-        payload = self.client.confluence_json(
-            "GET",
-            f"/rest/api/content?spaceKey={self.space_key}&title={encoded_title}&expand=body.storage,version",
-        )
-        for result in payload.get("results", []):
-            if result.get("title") == title:
+        for result in _list_child_pages(self.client, self.parent_page_id):
+            if result.get("title") != title:
+                continue
+            metadata = parse_page_metadata(_page_storage_value(result))
+            if not metadata or metadata.get("page_kind") in {None, "context"}:
                 return result
         return None
 
@@ -610,67 +695,173 @@ class AtlassianArtifactStore(ArtifactStore):
         self.parent_page_id = parent_page_id
 
     def list(self) -> list[Artifact]:
-        payload = self.client.confluence_json(
-            "GET",
-            f"/rest/api/content/{self.parent_page_id}/child/page?limit=200&expand=body.storage,version",
-        )
         artifacts: list[Artifact] = []
-        for page in payload.get("results", []):
-            metadata = parse_page_metadata(page["body"]["storage"]["value"])
-            artifact_payload = metadata.get("artifact")
-            if not artifact_payload:
-                continue
-            artifact = Artifact.model_validate(artifact_payload)
-            artifacts.append(artifact.model_copy(update={"path": page_url(self.client.confluence_base_url, page["id"])}))
+        for page in _list_child_pages(self.client, self.parent_page_id):
+            artifact = self._artifact_from_page(page)
+            if artifact is not None:
+                artifacts.append(artifact)
         return sorted(artifacts, key=lambda artifact: artifact.created_at, reverse=True)
 
     def get(self, artifact_id: str) -> Artifact | None:
-        for artifact in self.list():
-            if artifact.id == artifact_id:
-                return artifact
-        return None
+        page = self._find_page_by_artifact_id(artifact_id)
+        if page is None:
+            return None
+        return self._artifact_from_page(page)
 
     def save(self, artifact: Artifact) -> Artifact:
         title = f"[{artifact.task_id}] {artifact.title}"
-        body = build_page_body(title, {"artifact": artifact.model_dump(mode="json")}, artifact.content)
-        page = self._find_page_by_artifact_id(artifact.id)
+        page = self._resolve_page_for_artifact(artifact)
         if page is None:
-            created = self.client.confluence_json(
-                "POST",
-                "/rest/api/content",
-                {
-                    "type": "page",
-                    "title": title,
-                    "space": {"key": self.space_key},
-                    "ancestors": [{"id": self.parent_page_id}],
-                    "body": {"storage": {"value": body, "representation": "storage"}},
-                },
+            created = _create_page(
+                self.client,
+                space_key=self.space_key,
+                parent_page_id=self.parent_page_id,
+                title=title,
+                body=build_page_body(
+                    title,
+                    {
+                        "schema_version": PAGE_META_SCHEMA_VERSION,
+                        "page_kind": "artifact",
+                        "artifact": artifact.model_dump(mode="json"),
+                    },
+                    render_artifact_page_markdown(artifact),
+                ),
             )
-            return artifact.model_copy(update={"path": page_url(self.client.confluence_base_url, created["id"])} )
-        self.client.confluence_json(
-            "PUT",
-            f"/rest/api/content/{page['id']}",
+            page = created if created.get("version") else _get_page(self.client, created["id"])
+
+        stored_path = page_url(self.client.confluence_base_url, page["id"])
+        stored_artifact = artifact.model_copy(update={"path": stored_path})
+        body = build_page_body(
+            title,
             {
-                "id": page["id"],
-                "type": "page",
-                "title": title,
-                "version": {"number": page["version"]["number"] + 1},
-                "body": {"storage": {"value": body, "representation": "storage"}},
+                "schema_version": PAGE_META_SCHEMA_VERSION,
+                "page_kind": "artifact",
+                "artifact": stored_artifact.model_dump(mode="json"),
+                "page": {
+                    "id": page["id"],
+                    "url": stored_path,
+                    "space_key": self.space_key,
+                    "parent_page_id": self.parent_page_id,
+                    "title": title,
+                },
             },
+            render_artifact_page_markdown(stored_artifact),
         )
-        return artifact.model_copy(update={"path": page_url(self.client.confluence_base_url, page["id"])} )
+        if _page_storage_value(page) != body or page.get("title") != title:
+            _update_page(self.client, page=page, title=title, body=body)
+        return stored_artifact
 
     def _find_page_by_artifact_id(self, artifact_id: str) -> dict | None:
-        payload = self.client.confluence_json(
-            "GET",
-            f"/rest/api/content/{self.parent_page_id}/child/page?limit=200&expand=body.storage,version",
-        )
-        for page in payload.get("results", []):
-            metadata = parse_page_metadata(page["body"]["storage"]["value"])
+        for page in _list_child_pages(self.client, self.parent_page_id):
+            metadata = parse_page_metadata(_page_storage_value(page))
             artifact_payload = metadata.get("artifact") or {}
             if artifact_payload.get("id") == artifact_id:
                 return page
         return None
+
+    def _artifact_from_page(self, page: dict) -> Artifact | None:
+        metadata = parse_page_metadata(_page_storage_value(page))
+        artifact_payload = metadata.get("artifact")
+        if not artifact_payload:
+            return None
+        try:
+            artifact = Artifact.model_validate(artifact_payload)
+        except ValidationError:
+            return None
+        return artifact.model_copy(update={"path": page_url(self.client.confluence_base_url, page["id"])})
+
+    def _resolve_page_for_artifact(self, artifact: Artifact) -> dict | None:
+        page_id = _page_id_from_artifact_path(artifact.path)
+        if page_id is not None:
+            try:
+                page = _get_page(self.client, page_id)
+            except ValueError:
+                page = None
+            if page is not None:
+                metadata = parse_page_metadata(_page_storage_value(page))
+                artifact_payload = metadata.get("artifact") or {}
+                if artifact_payload.get("id") == artifact.id:
+                    return page
+        return self._find_page_by_artifact_id(artifact.id)
+
+
+def _page_storage_value(page: dict) -> str:
+    return str(page.get("body", {}).get("storage", {}).get("value") or "")
+
+
+def _page_id_from_artifact_path(path: str) -> str | None:
+    if "://" not in path:
+        return None
+    parsed_path = parse.urlparse(path)
+    page_ids = parse.parse_qs(parsed_path.query).get("pageId") or []
+    if not page_ids:
+        return None
+    page_id = page_ids[0]
+    return page_id if page_id.isdigit() else None
+
+
+def _list_child_pages(client: ConfluenceApiClient, parent_page_id: str) -> list[dict]:
+    pages: list[dict] = []
+    start = 0
+    while True:
+        payload = client.confluence_json(
+            "GET",
+            f"/rest/api/content/{parent_page_id}/child/page?limit={CONFLUENCE_PAGE_BATCH_SIZE}&start={start}&expand=body.storage,version",
+        )
+        results = payload.get("results", [])
+        pages.extend(results)
+        if len(results) < CONFLUENCE_PAGE_BATCH_SIZE:
+            break
+        start += len(results)
+    return pages
+
+
+def _create_page(
+    client: ConfluenceApiClient,
+    *,
+    space_key: str,
+    parent_page_id: str,
+    title: str,
+    body: str,
+) -> dict:
+    return client.confluence_json(
+        "POST",
+        "/rest/api/content?expand=body.storage,version",
+        {
+            "type": "page",
+            "title": title,
+            "space": {"key": space_key},
+            "ancestors": [{"id": parent_page_id}],
+            "body": {"storage": {"value": body, "representation": "storage"}},
+        },
+    )
+
+
+def _update_page(client: ConfluenceApiClient, *, page: dict, title: str, body: str) -> dict:
+    version_number = int(page.get("version", {}).get("number") or 1)
+    response = client.confluence_json(
+        "PUT",
+        f"/rest/api/content/{page['id']}",
+        {
+            "id": page["id"],
+            "type": "page",
+            "title": title,
+            "version": {"number": version_number + 1},
+            "body": {"storage": {"value": body, "representation": "storage"}},
+        },
+    )
+    if response:
+        return response
+    return {
+        "id": page["id"],
+        "title": title,
+        "version": {"number": version_number + 1},
+        "body": {"storage": {"value": body}},
+    }
+
+
+def _get_page(client: ConfluenceApiClient, page_id: str) -> dict:
+    return client.confluence_json("GET", f"/rest/api/content/{page_id}?expand=body.storage,version")
 
 
 def _latest_event_key(task: Task) -> str | None:
@@ -731,4 +922,3 @@ def _dedupe_notes(notes: list[str]) -> str:
         if note not in unique_notes:
             unique_notes.append(note)
     return " ".join(unique_notes)
-

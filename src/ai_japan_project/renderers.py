@@ -2,7 +2,9 @@
 
 from textwrap import dedent
 
-from .models import ProjectContext, Review, Task
+import yaml
+
+from .models import Artifact, ProjectContext, Review, Task
 
 
 def render_context_markdown(context: ProjectContext) -> str:
@@ -160,3 +162,60 @@ def render_review_document(review: Review, notes: str = "") -> str:
     if notes.strip():
         lines.append(notes.strip())
     return "\n".join(lines).strip() + "\n"
+
+
+def render_artifact_page_markdown(artifact: Artifact) -> str:
+    if artifact.kind != "critic_review":
+        return artifact.content.strip() + "\n"
+
+    frontmatter, notes = _split_markdown_frontmatter(artifact.content)
+    if not frontmatter:
+        return artifact.content.strip() + "\n"
+
+    missing_items = [str(item).strip() for item in frontmatter.get("missing_items") or [] if str(item).strip()]
+    recommended_changes = [
+        str(item).strip() for item in frontmatter.get("recommended_changes") or [] if str(item).strip()
+    ]
+    verdict = str(frontmatter.get("verdict") or "revise").strip()
+    summary = str(frontmatter.get("summary") or "요약이 제공되지 않았습니다.").strip()
+
+    lines = [
+        "## Verdict",
+        f"- 상태: {verdict}",
+        f"- 요약: {summary}",
+        "",
+        "## Missing Items",
+    ]
+    if missing_items:
+        lines.extend(f"- {item}" for item in missing_items)
+    else:
+        lines.append("- 없음")
+
+    lines.extend(["", "## Recommended Changes"])
+    if recommended_changes:
+        lines.extend(f"- {item}" for item in recommended_changes)
+    else:
+        lines.append("- 없음")
+
+    if notes.strip():
+        lines.extend(["", "## Notes", notes.strip()])
+    return "\n".join(lines).strip() + "\n"
+
+
+def _split_markdown_frontmatter(document: str) -> tuple[dict, str]:
+    stripped = document.strip()
+    if not stripped.startswith("---"):
+        return {}, document
+
+    lines = document.splitlines()
+    closing = None
+    for index in range(1, len(lines)):
+        if lines[index].strip() == "---":
+            closing = index
+            break
+    if closing is None:
+        return {}, document
+
+    frontmatter = yaml.safe_load("\n".join(lines[1:closing])) or {}
+    body = "\n".join(lines[closing + 1 :]).lstrip("\n")
+    return frontmatter, body
