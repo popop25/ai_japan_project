@@ -27,3 +27,5 @@ streamlit.err.log
 .tmp_test_foundation/
 .claude/
 .codex-worktrees/
+react_ui/node_modules/
+react_ui/dist/

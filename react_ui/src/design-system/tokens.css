@@ -1,0 +1,25 @@
+:root {
+  --font-body: "Aptos", "Segoe UI Variable Text", "Malgun Gothic", "Noto Sans KR", sans-serif;
+  --font-display: "Bahnschrift", "Aptos Display", "Segoe UI Variable Display", sans-serif;
+  --canvas: #eef3f7;
+  --canvas-warm: #f7f4ed;
+  --surface-raised: rgba(255, 255, 255, 0.86);
+  --surface-strong: rgba(255, 255, 255, 0.96);
+  --surface-subtle: rgba(241, 245, 248, 0.96);
+  --border-default: rgba(18, 32, 51, 0.11);
+  --border-strong: rgba(18, 32, 51, 0.18);
+  --text-strong: #101b2c;
+  --text-muted: #526077;
+  --text-subtle: #73849a;
+  --brand: #1f4fd6;
+  --brand-soft: rgba(31, 79, 214, 0.11);
+  --teal: #0b7b74;
+  --teal-soft: rgba(11, 123, 116, 0.12);
+  --amber: #a46618;
+  --amber-soft: rgba(164, 102, 24, 0.13);
+  --shadow-lg: 0 26px 72px rgba(18, 32, 51, 0.12);
+  --shadow-md: 0 18px 42px rgba(18, 32, 51, 0.08);
+  --radius-2xl: 32px;
+  --radius-xl: 24px;
+  --radius-lg: 20px;
+}
