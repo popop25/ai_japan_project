@@ -10,6 +10,7 @@ from .paths import (
     CONTEXT_MARKDOWN_PATH,
     CONTEXT_YAML_PATH,
     RUNS_DIR,
+    SMOKE_RECEIPTS_DIR,
     TASKS_DIR,
 )
 from .renderers import render_context_markdown
@@ -19,6 +20,7 @@ def ensure_runtime_dirs() -> None:
     TASKS_DIR.mkdir(parents=True, exist_ok=True)
     ARTIFACTS_DIR.mkdir(parents=True, exist_ok=True)
     RUNS_DIR.mkdir(parents=True, exist_ok=True)
+    SMOKE_RECEIPTS_DIR.mkdir(parents=True, exist_ok=True)
 
 
 def load_yaml(path: Path) -> dict:

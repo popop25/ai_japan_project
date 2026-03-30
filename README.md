@@ -1,88 +1,148 @@
-﻿# AI_Japan_project
+# AI_Japan_project
 
-`AI_Japan_project` is a local-first demo app for a Japan-market AI agent PoC. It shows how a PM, operations lead, or other non-developer can run an AI workflow in the browser, moving from project context to requirements drafting and quality review.
+`AI_Japan_project` is a Streamlit-based AI work harness for business-facing workflows.
 
-The product flow is:
+It is designed for a setup where the workflow platform and the reasoning agent are separate:
 
-1. Edit project context
-2. Create a PM task for a requirements draft
-3. Generate a PM packet for an external agent such as Codex or Claude Code
-4. Paste the PM result back into the app
-5. Generate a Critic packet
-6. Paste the Critic review back into the app
-7. Track status, artifacts, and timeline in the UI
+- the harness owns context, task state, packets, artifacts, and system-of-record sync
+- the external agent owns the actual PM draft or Critic review generation
 
-## Demo Scenario
+Today the project supports both a local demo mode and a live Atlassian-backed mode.
 
-- A Japanese retail company is evaluating whether business teams can operate AI-assisted workflows without waiting for a full internal tool build.
-- The first workflow focuses on a PM agent drafting a requirements document and a Critic agent acting as a quality gate before stakeholder review.
-- The demo is designed to highlight business clarity and operational control, not just model output.
+## What the Harness Owns
 
-## Stack
+The project is organized around six responsibilities:
 
-- Python 3.12
-- Streamlit UI
-- Shared Python service layer under `src/ai_japan_project`
-- Local file storage under `project/`
-- Optional Atlassian Cloud adapters for Jira and Confluence
+1. Context management
+2. Task state management
+3. PM / Critic packet generation
+4. Artifact persistence
+5. Jira / Confluence synchronization
+6. External agent handoff orchestration
 
-## App Modes
+This is why the project should be thought of as a harness or control plane, not as a single embedded chatbot.
 
-The app supports two runtime modes.
+## Runtime Modes
 
-- `AJP_MODE=local`
-  - Default mode.
-  - Canonical context, tasks, artifacts, and run history stay under `project/`.
-  - No Atlassian credentials are required.
-  - Tests should assume this mode never makes Jira or Confluence calls.
-- `AJP_MODE=atlassian`
-  - Jira Cloud becomes the canonical task store.
-  - Confluence Cloud becomes the canonical context and artifact store.
-  - Prompt packets and run history still stay local under `project/runs`.
-  - Startup and tests should rely on config validation and injected seams, not on live Atlassian access.
+### `AJP_MODE=local`
 
-## Atlassian Cloud Prerequisites
+- Canonical context lives in `project/context.yaml` and `project/03_context.md`
+- Tasks live in `project/tasks/*.yaml`
+- Artifacts live in `project/artifacts/*.md`
+- Prompt packets and run history live in `project/runs/*`
+- No Atlassian credentials are required
 
-When `AJP_MODE=atlassian`, all of the following are required:
+### `AJP_MODE=atlassian`
 
-- `ATLASSIAN_EMAIL`: Atlassian account email paired with the API token for both Jira Cloud and Confluence Cloud.
-- `ATLASSIAN_API_TOKEN`: API token created from the Atlassian account security settings page.
-- `JIRA_BASE_URL`: Jira Cloud site root only, for example `https://example.atlassian.net`.
-- `JIRA_PROJECT_KEY`: Jira project key where app tasks will be created and updated.
-- `CONFLUENCE_BASE_URL`: Confluence Cloud site root including `/wiki`, for example `https://example.atlassian.net/wiki`.
-- `CONFLUENCE_SPACE_KEY`: Confluence space key where the canonical project context and artifacts live.
-- `CONFLUENCE_CONTEXT_PARENT_ID`: Existing numeric Confluence page ID under which `03_Context` will be created or updated.
-- `CONFLUENCE_ARTIFACTS_PARENT_ID`: Existing numeric Confluence page ID under which generated artifact pages will be created or updated.
+- Jira is the canonical task store
+- Confluence is the canonical context and artifact store
+- Prompt packets and run history still remain local under `project/runs/*`
+- The same Streamlit UI and `ProjectService` flow are reused
 
-Validation that happens without live network calls:
+## Current Status
 
-- Missing Atlassian variables fail fast only when `AJP_MODE=atlassian`.
-- Jira and Confluence base URLs are normalized and checked for the expected site shape.
-- Confluence parent IDs are checked to be numeric page IDs.
-- `factory.build_project_service(..., atlassian_client_factory=...)` can be exercised with a fake client factory.
-- `AtlassianClient(..., opener=...)` can be exercised with a fake opener to verify auth headers, URLs, payloads, and HTTP error handling.
-- Jira issue existence checks fail closed: only a clear 404 is treated as missing, while auth, rate-limit, server, and network errors stop sync before a duplicate issue is created.
+This repository is no longer just a local mockup.
 
-What is still not covered in this repo:
+The current codebase already includes:
 
-- Real Jira Cloud authentication with a live API token.
-- Real Confluence Cloud page creation and permission checks.
-- Site-specific Jira workflow transitions and Confluence space restrictions.
+- local / Atlassian mode switching
+- Jira task synchronization with fail-closed issue existence checks
+- Confluence context and artifact synchronization
+- `.env` auto-loading with OS env precedence
+- readiness / preflight tooling
+- repeatable live smoke tooling
+- smoke cleanup tooling
+- live tenant hardening for localized Jira workflows and Confluence metadata fallback
 
-See `.env.example` for the full configuration template.
+A live end-to-end smoke run has already succeeded against a real Jira + Confluence tenant.
 
-## Run
+## Repository Map
+
+- `app_ui/`
+  - Streamlit UI shell and workflow screens
+- `src/ai_japan_project/`
+  - service layer, local stores, Atlassian adapters, operational tooling
+- `project/`
+  - seed context, skills, and local runtime data
+- `scripts/`
+  - readiness, smoke, and cleanup entry points
+- `docs/`
+  - architecture, operations, and external agent integration notes
+
+## Run the App
 
 ```powershell
-cd D:\code\skax\AI_Japan_project
 python -m streamlit run app_ui/streamlit_app.py
 ```
 
-## Test
+If you want to force Atlassian mode for the current shell:
 
 ```powershell
-cd D:\code\skax\AI_Japan_project
-pytest tests -q
+$env:AJP_MODE="atlassian"
+python -m streamlit run app_ui/streamlit_app.py
 ```
 
+## Operational Commands
 
+### Readiness / preflight
+
+```powershell
+python scripts/ajp_readiness.py
+python scripts/ajp_readiness.py --mode atlassian
+```
+
+### Live smoke run
+
+```powershell
+python scripts/ajp_smoke.py
+```
+
+### Smoke cleanup
+
+```powershell
+python scripts/ajp_cleanup.py
+python scripts/ajp_cleanup.py --apply
+```
+
+### Tests
+
+```powershell
+pytest tests -q --basetemp=.tmp_test_runs\pytest
+```
+
+## Configuration
+
+Keep your live Atlassian credentials in local environment variables or in a local `.env` file.
+
+Settings are resolved in this order:
+
+1. OS environment variables
+2. repository `.env`
+
+`.env` is ignored by Git. `.env.example` remains the checked-in template.
+
+## External Agent Model
+
+The project is intentionally agent-neutral.
+
+The expected workflow is:
+
+1. generate a PM or Critic packet in the app
+2. send that packet to your own Codex, Claude, or equivalent agent
+3. receive a Markdown result
+4. paste the result back into the app
+5. let the harness update local state plus Jira / Confluence as needed
+
+Supported patterns include:
+
+- chat handoff
+- file handoff
+- PM / Critic parallel handoff
+
+See [agent integration](docs/agent-integration.md) for the practical patterns.
+
+## Docs
+
+- [Architecture](docs/architecture.md)
+- [Operations](docs/operations.md)
+- [External agent integration](docs/agent-integration.md)

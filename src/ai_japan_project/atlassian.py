@@ -21,6 +21,7 @@ TASK_PROPERTY_KEY = "ai_japan_project.task"
 PAGE_META_PREFIX = "<!-- AJP_META:"
 PAGE_META_SUFFIX = "-->"
 JIRA_LABEL = "ai-japan-project"
+JIRA_TASK_ISSUE_TYPE_ALIASES = ("Task", "\uc791\uc5c5")
 CONFLUENCE_PAGE_BATCH_SIZE = 100
 PAGE_META_SCHEMA_VERSION = 1
 CONFLUENCE_META_PROPERTY_KEY = "ai_japan_project.meta"
@@ -184,6 +185,20 @@ class AtlassianClient:
 
 def jira_status_target(status: Status) -> JiraStatusTarget:
     return JIRA_STATUS_TARGETS[status]
+
+
+def is_task_issue_type_name(name: str) -> bool:
+    normalized = _normalize_status_name(name)
+    return any(normalized == _normalize_status_name(candidate) for candidate in JIRA_TASK_ISSUE_TYPE_ALIASES)
+
+
+def resolve_task_issue_type_name(issue_types: list[dict]) -> str | None:
+    for candidate in JIRA_TASK_ISSUE_TYPE_ALIASES:
+        for issue_type in issue_types:
+            name = str(issue_type.get("name") or "").strip()
+            if name and _normalize_status_name(name) == _normalize_status_name(candidate):
+                return name
+    return None
 
 
 def task_status_to_jira(status: Status) -> str:
@@ -363,6 +378,7 @@ class AtlassianTaskStore(TaskStore):
     def __init__(self, client: JiraApiClient, project_key: str) -> None:
         self.client = client
         self.project_key = project_key
+        self._issue_type_name: str | None = None
 
     def list(self) -> list[Task]:
         tasks: list[Task] = []
@@ -409,12 +425,34 @@ class AtlassianTaskStore(TaskStore):
         }
         return self.client.jira_json("POST", "/rest/api/3/search/jql", payload).get("issues", [])
 
+    def _resolve_issue_type_name(self) -> str:
+        if self._issue_type_name:
+            return self._issue_type_name
+        project = self.client.jira_json("GET", f"/rest/api/3/project/{self.project_key}")
+        issue_types = list(project.get("issueTypes") or [])
+        issue_type_name = resolve_task_issue_type_name(issue_types)
+        if issue_type_name is None:
+            available = ", ".join(
+                sorted(
+                    {
+                        str(item.get("name") or "").strip()
+                        for item in issue_types
+                        if str(item.get("name") or "").strip()
+                    }
+                )
+            ) or "(none)"
+            raise ValueError(
+                f"Project {self.project_key} does not expose a compatible task issue type. Available issue types: {available}."
+            )
+        self._issue_type_name = issue_type_name
+        return issue_type_name
+
     def _create_issue(self, task: Task) -> str:
         payload = {
             "fields": {
                 "project": {"key": self.project_key},
                 "summary": task.title,
-                "issuetype": {"name": "Task"},
+                "issuetype": {"name": self._resolve_issue_type_name()},
                 "labels": [JIRA_LABEL],
                 "description": render_issue_description(task),
             }

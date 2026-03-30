@@ -25,3 +25,5 @@ streamlit.err.log
 !.env.example
 
 .tmp_test_foundation/
+.claude/
+.codex-worktrees/

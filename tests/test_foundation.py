@@ -53,8 +53,9 @@ class RawHTTPResponse(FakeHTTPResponse):
 class FakeJiraClient:
     jira_base_url = "https://example.atlassian.net"
 
-    def __init__(self, project_key: str = "AJP") -> None:
+    def __init__(self, project_key: str = "AJP", issue_type_names: tuple[str, ...] = ("Task", "Bug")) -> None:
         self.project_key = project_key
+        self.issue_type_names = issue_type_names
         self._next_issue_number = 1
         self.issues: dict[str, dict] = {}
         self.issue_status_errors: dict[str, Exception] = {}
@@ -94,6 +95,12 @@ class FakeJiraClient:
         method = method.upper()
         payload = payload or {}
 
+        if method == "GET" and path == f"/rest/api/3/project/{self.project_key}":
+            return {
+                "key": self.project_key,
+                "issueTypes": [{"name": name} for name in self.issue_type_names],
+            }
+
         if (method == "GET" and path.startswith("/rest/api/3/search?")) or (method == "POST" and path == "/rest/api/3/search/jql"):
             return {
                 "issues": [
@@ -118,6 +125,7 @@ class FakeJiraClient:
                     "summary": fields["summary"],
                     "description": fields.get("description"),
                     "labels": list(fields.get("labels") or []),
+                    "issuetype": dict(fields.get("issuetype") or {}),
                 },
                 "status_name": "To Do",
                 "status_category": "new",
@@ -581,6 +589,17 @@ def test_atlassian_task_store_accepts_korean_status_aliases() -> None:
     assert saved.refs["jira_issue_key"] == issue_key
     assert issue["status_name"] == "진행 중"
     assert issue["comments"][-1] == "PM packet generated."
+
+
+def test_atlassian_task_store_creates_issue_with_korean_task_type_alias() -> None:
+    client = FakeJiraClient(project_key="KAN", issue_type_names=("\uc5d0\ud53d", "\uc791\uc5c5", "\ud558\uc704 \uc791\uc5c5"))
+    store = AtlassianTaskStore(client, project_key="KAN")
+    task = make_task(task_id="task_korean_issue_type")
+
+    saved = store.save(task)
+
+    assert saved.refs["jira_issue_key"] == "KAN-1"
+    assert client.issue("KAN-1")["fields"]["issuetype"]["name"] == "\uc791\uc5c5"
 
 
 def test_build_page_body_round_trip_metadata() -> None:
