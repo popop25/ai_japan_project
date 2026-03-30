@@ -59,7 +59,12 @@ inject_theme()
 show_flash()
 
 settings = get_settings()
-mode_label = "Atlassian Cloud" if settings.mode == AppMode.ATLASSIAN else "Local Demo"
+if settings.mode == AppMode.ATLASSIAN:
+    mode_label = "Atlassian Cloud"
+    mode_detail = "Live connected"
+else:
+    mode_label = "Local Demo"
+    mode_detail = "File-backed"
 
 try:
     service = get_service()
@@ -71,17 +76,25 @@ except ValueError as exc:
 dashboard = service.get_dashboard()
 context = dashboard.context
 next_action = context.next_actions[0] if context.next_actions else (
-    f"{dashboard.active_tasks[0].title} 이어서 진행" if dashboard.active_tasks else "작업 흐름에서 첫 PM 작업 시작"
+    f"{dashboard.active_tasks[0].title} / continue" if dashboard.active_tasks else "Start the first PM task"
 )
+connection_links = []
+if settings.mode == AppMode.ATLASSIAN:
+    connection_links = [
+        ("Jira", settings.jira_base_url, f"Project {settings.jira_project_key}"),
+        ("Confluence", settings.confluence_base_url, f"Space {settings.confluence_space_key[:8]}"),
+    ]
 
 render_app_shell(
     project_name=context.name,
     mode_label=mode_label,
+    mode_detail=mode_detail,
     customer=context.customer,
     current_stage=context.current_stage,
     active_work=context.active_work,
     last_updated=context.last_updated,
     next_action=next_action,
+    connection_links=connection_links,
 )
 
 tab_names = ["대시보드", "컨텍스트", "작업 흐름", "산출물"]

@@ -245,6 +245,37 @@ def inject_theme() -> None:
         .ajp-blue { background: var(--ajp-primary-soft); color: var(--ajp-primary-strong); }
         .ajp-green { background: var(--ajp-success-soft); color: var(--ajp-success); }
         .ajp-amber { background: var(--ajp-warning-soft); color: var(--ajp-warning); }
+        .ajp-link-strip {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 0.55rem;
+          margin-top: 0.8rem;
+        }
+        .ajp-link-pill {
+          display: inline-flex;
+          align-items: center;
+          gap: 0.4rem;
+          padding: 0.5rem 0.82rem;
+          border-radius: 999px;
+          border: 1px solid rgba(31, 111, 235, 0.14);
+          background: rgba(255, 255, 255, 0.95);
+          color: var(--ajp-text);
+          font-size: 0.86rem;
+          font-weight: 700;
+          text-decoration: none;
+          box-shadow: 0 10px 18px rgba(15, 23, 42, 0.04);
+        }
+        .ajp-link-pill:hover {
+          border-color: rgba(31, 111, 235, 0.3);
+          color: var(--ajp-primary-strong);
+        }
+        .ajp-link-pill span {
+          color: var(--ajp-text-muted);
+          font-size: 0.75rem;
+          font-weight: 800;
+          letter-spacing: 0.03em;
+          text-transform: uppercase;
+        }
         .ajp-grid {
           display: grid;
           grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
@@ -430,12 +461,24 @@ def status_badge_html(status: str) -> str:
 def render_app_shell(
     project_name: str,
     mode_label: str,
+    mode_detail: str,
     customer: str,
     current_stage: str,
     active_work: str,
     last_updated: str,
     next_action: str,
+    connection_links: list[tuple[str, str, str]] | None = None,
 ) -> None:
+    link_html = ""
+    if connection_links:
+        chips = []
+        for label, href, note in connection_links:
+            chips.append(
+                f'<a class="ajp-link-pill" href="{_escape(href)}" target="_blank" rel="noreferrer">'
+                f'<span>{_escape(note)}</span>{_escape(label)}</a>'
+            )
+        link_html = f'<div class="ajp-link-strip">{"".join(chips)}</div>'
+
     st.markdown(
         f"""
         <section class="ajp-shell">
