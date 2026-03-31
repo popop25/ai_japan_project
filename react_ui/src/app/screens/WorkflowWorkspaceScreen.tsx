@@ -1,169 +1,237 @@
-import { ProductData, ViewId } from "../../types";
-import { Panel } from "../../design-system/components/Panel";
-import { StatusBadge } from "../../design-system/components/StatusBadge";
-import { Stepper } from "../../design-system/components/Stepper";
+import { ProductData, PrototypeScreenState, QueueItem, ViewId } from "../../types";
+import { ActionPanel } from "../../design-system/components/ActionPanel";
+import { FocusBar } from "../../design-system/components/FocusBar";
+import { InlineNotice } from "../../design-system/components/InlineNotice";
+import { ProofPanel } from "../../design-system/components/ProofPanel";
+import { ScreenStatePanel } from "../../design-system/components/ScreenStatePanel";
+import { TaskSwitcher } from "../../design-system/components/TaskSwitcher";
+import { TimelinePanel } from "../../design-system/components/TimelinePanel";
+import { WorkflowStepper } from "../../design-system/components/WorkflowStepper";
 
 interface WorkflowWorkspaceScreenProps {
   data: ProductData;
   onNavigate: (view: ViewId) => void;
+  state?: PrototypeScreenState;
+  onResetState?: () => void;
 }
 
-export function WorkflowWorkspaceScreen({ data, onNavigate }: WorkflowWorkspaceScreenProps) {
-  const currentStep = data.workflow.steps.find((step) => step.status === "current") ?? data.workflow.steps[data.workflow.steps.length - 1];
+function recoverFixture(onResetState?: () => void) {
+  if (onResetState) {
+    onResetState();
+    return;
+  }
 
+  if (typeof window !== "undefined") {
+    window.location.reload();
+  }
+}
+
+function workflowTask(data: ProductData): QueueItem {
   return (
-    <>
-      <Panel
-        tone="warning"
-        eyebrow="Workflow workspace"
-        title={currentStep.title}
-        description={data.workflow.headline}
-        badge={<StatusBadge status={data.workflow.currentStatus} />}
-      >
-        <div className="split-callout">
-          <div className="callout-copy">
-            <p className="lead">{currentStep.detail}</p>
-            <p className="footer-note">Operator action: {currentStep.operatorAction}</p>
-            <p className="footer-note">Outcome after completion: {currentStep.outcome}</p>
-          </div>
-          <div className="button-stack">
-            <button className="button button--primary" onClick={() => onNavigate("artifacts")} type="button">
-              Inspect blocking artifact
+    data.queue.find((item) => item.jiraKey === data.workflow.currentTaskId) ?? {
+      artifactCount: 0,
+      id: data.workflow.currentTaskId,
+      jiraKey: data.workflow.currentTaskId,
+      nextAction: data.workflow.steps.find((step) => step.status === "current")?.operatorAction ?? "No operator action published.",
+      owner: "Operator",
+      stage: data.workflow.steps.find((step) => step.status === "current")?.title ?? data.workflow.title,
+      status: data.workflow.currentStatus,
+      title: data.workflow.title,
+      updatedAt: data.overview.lastUpdated,
+    }
+  );
+}
+
+export function WorkflowWorkspaceScreen({ data, onNavigate, state = "ready", onResetState }: WorkflowWorkspaceScreenProps) {
+  if (state === "loading") {
+    return (
+      <ScreenStatePanel
+        description="Workflow detail is waiting for current task, packet contract, and trace data."
+        detail="The layout should hold its shape while live task-detail endpoints replace fixture payloads."
+        eyebrow="Workflow Detail"
+        highlights={[
+          "Keep current step readable before packet details load.",
+          "Do not derive missing state transitions in the client.",
+          "Trace data is supportive, not authoritative.",
+        ]}
+        title="Loading workflow detail"
+        state="loading"
+      />
+    );
+  }
+
+  if (state === "error") {
+    return (
+      <ScreenStatePanel
+        actions={
+          <div className="button-row">
+            <button className="button button--primary" onClick={() => recoverFixture(onResetState)} type="button">
+              Use fixture payload
             </button>
             <button className="button button--secondary" onClick={() => onNavigate("dashboard")} type="button">
-              Back to dashboard
+              Return to overview
             </button>
           </div>
-        </div>
-      </Panel>
+        }
+        description="Workflow detail could not be rendered safely."
+        detail="Keep navigation alive and wait for the backend to supply canonical task state."
+        eyebrow="Workflow Detail"
+        highlights={[
+          "State transitions remain in the service layer.",
+          "Do not fake packet or review data.",
+        ]}
+        title="Workflow detail unavailable"
+        state="error"
+      />
+    );
+  }
 
-      <Panel
-        eyebrow="Guided flow"
-        title={data.workflow.title}
-        description={data.workflow.subtitle}
-        badge={<StatusBadge status={data.workflow.currentStatus} />}
-      >
-        <Stepper steps={data.workflow.steps} />
-      </Panel>
+  const workflow = data.workflow;
+  const currentStep = workflow.steps.find((step) => step.status === "current") ?? workflow.steps[workflow.steps.length - 1] ?? null;
+  const task = workflowTask(data);
 
-      <div className="screen-grid screen-grid--workflow-main">
-        <Panel
-          eyebrow="Packet contract"
-          title="Packet preview"
-          description="The frontend should render the packet contract clearly before the handoff leaves the product."
-        >
-          <div className="detail-grid">
-            <div className="detail-tile">
-              <span>Audience</span>
-              <strong>{data.workflow.packet.audience}</strong>
-            </div>
-            <div className="detail-tile">
-              <span>Handoff mode</span>
-              <strong>{data.workflow.packet.handoffMode}</strong>
-            </div>
-            <div className="detail-tile">
-              <span>Objective</span>
-              <strong>{data.workflow.packet.objective}</strong>
-            </div>
+  if (state === "empty" || !currentStep) {
+    return (
+      <ScreenStatePanel
+        actions={
+          <div className="button-row">
+            <button className="button button--primary" onClick={() => onNavigate("dashboard")} type="button">
+              Return to overview
+            </button>
+            <button className="button button--secondary" onClick={() => onNavigate("context")} type="button">
+              Review context
+            </button>
           </div>
+        }
+        description="No guided task detail is available."
+        detail="An empty workflow screen should redirect the operator to context or queue selection instead of rendering decorative chrome."
+        eyebrow="Workflow Detail"
+        highlights={[
+          "Stepper must tolerate no steps.",
+          "Packet view should not invent a contract.",
+        ]}
+        title="No workflow selected"
+        state="empty"
+      />
+    );
+  }
 
-          <div className="list-columns">
-            <div>
-              <h4>Inputs</h4>
-              <ul className="clean-list">
-                {data.workflow.packet.inputs.map((item) => (
-                  <li key={item}>{item}</li>
-                ))}
-              </ul>
-            </div>
-            <div>
-              <h4>Output contract</h4>
-              <ul className="clean-list">
-                {data.workflow.packet.outputContract.map((item) => (
-                  <li key={item}>{item}</li>
-                ))}
-              </ul>
-            </div>
-          </div>
+  const proofArtifact = data.artifacts.find((artifact) => artifact.linkedTask === workflow.currentTaskId) ?? data.artifacts[0] ?? null;
+  const hasPacketContract =
+    Boolean(workflow.packet.title || workflow.packet.audience || workflow.packet.handoffMode || workflow.packet.objective) ||
+    workflow.packet.inputs.length > 0 ||
+    workflow.packet.outputContract.length > 0 ||
+    Boolean(workflow.packet.snippet.trim());
 
-          <pre className="packet-snippet">{data.workflow.packet.snippet}</pre>
-        </Panel>
+  return (
+    <div className="cp-stack cp-stack--xl">
+      <FocusBar
+        currentStage={currentStep.title}
+        onPrimaryAction={() => onNavigate("artifacts")}
+        onSecondaryAction={() => onNavigate("dashboard")}
+        primaryLabel="Open artifact review"
+        secondaryLabel="Return to overview"
+        task={{ ...task, nextAction: currentStep.operatorAction }}
+      />
 
-        <div className="stack">
-          <Panel
-            eyebrow="Handoff"
-            title="Supported operator paths"
-            description="The product should meet the operator where they already work instead of forcing one agent surface."
-          >
-            {data.workflow.handoffModes.map((mode) => (
-              <div className="handoff-card" key={mode.name}>
-                <h3>{mode.name}</h3>
-                <p>{mode.summary}</p>
-                <strong>{mode.fit}</strong>
-              </div>
-            ))}
-          </Panel>
-
-          <Panel
-            eyebrow="Traceability"
-            title="Run trace"
-            description="A productized history of what the harness already recorded behind the scenes."
-          >
-            <div className="timeline">
-              {data.workflow.runTrace.map((entry) => (
-                <div className="timeline__item" key={`${entry.time}-${entry.label}`}>
-                  <span className="timeline__time">{entry.time}</span>
-                  <div className="timeline__body">
-                    <h3>{entry.label}</h3>
-                    <p>{entry.detail}</p>
-                  </div>
-                  <StatusBadge status={entry.status} />
-                </div>
-              ))}
-            </div>
-          </Panel>
-        </div>
+      <div className="content-grid content-grid--workflow">
+        <WorkflowStepper steps={workflow.steps} />
+        <ProofPanel artifact={proofArtifact} connections={data.connections} task={task} title="Jira / Confluence / runtime proof" />
       </div>
 
-      <div className="screen-grid screen-grid--two-column">
-        <Panel
-          eyebrow="Operator checklist"
-          title="What the user should do next"
-          description="Keep the human-in-the-loop explicit and make the sequence easy to follow."
+      <div className="content-grid content-grid--workflow">
+        <ActionPanel
+          actions={
+            <button className="button button--primary" onClick={() => onNavigate("artifacts")} type="button">
+              Inspect returned review
+            </button>
+          }
+          description="The client renders packet contract and handoff choices. State transition logic stays in the backend."
+          eyebrow="Dispatch"
+          title="Packet + handoff operation"
+          tone="brand"
         >
-          <div className="stack">
-            {data.workflow.checklists.map((block) => (
-              <div className="field-row" key={block.title}>
-                <span className="field-label">{block.title}</span>
+          {hasPacketContract ? (
+            <>
+              <div className="triple-grid">
+                <div className="info-cell">
+                  <span>Audience</span>
+                  <strong>{workflow.packet.audience}</strong>
+                </div>
+                <div className="info-cell">
+                  <span>Handoff mode</span>
+                  <strong>{workflow.packet.handoffMode}</strong>
+                </div>
+                <div className="info-cell">
+                  <span>Objective</span>
+                  <strong>{workflow.packet.objective}</strong>
+                </div>
+              </div>
+              <div className="dual-list">
+                <div className="surface-block">
+                  <span>Inputs</span>
+                  <ul className="clean-list">
+                    {workflow.packet.inputs.map((item) => (
+                      <li key={item}>{item}</li>
+                    ))}
+                  </ul>
+                </div>
+                <div className="surface-block">
+                  <span>Output contract</span>
+                  <ul className="clean-list">
+                    {workflow.packet.outputContract.map((item) => (
+                      <li key={item}>{item}</li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+              <pre className="packet-snippet">{workflow.packet.snippet}</pre>
+            </>
+          ) : (
+            <InlineNotice
+              description="Packet metadata remains empty until the backend supplies the task detail payload."
+              title="No packet preview is available"
+            />
+          )}
+        </ActionPanel>
+
+        <ActionPanel
+          description="These routes remain operator-selected. The frontend does not simulate a live agent runtime."
+          eyebrow="Handoff paths"
+          title="External agent options"
+        >
+          {workflow.handoffModes.map((mode) => (
+            <div className="signal-row signal-row--compact" key={mode.name}>
+              <span>{mode.name}</span>
+              <strong>{mode.fit}</strong>
+              <p>{mode.summary}</p>
+            </div>
+          ))}
+        </ActionPanel>
+      </div>
+
+      <div className="content-grid content-grid--two">
+        <TimelinePanel eyebrow="Traceability" items={workflow.runTrace.map((entry) => ({ detail: entry.detail, status: entry.status, time: entry.time, title: entry.label }))} title="Run trace" />
+        <ActionPanel eyebrow="Operator check" title="Next controlled moves">
+          {workflow.checklists.length ? (
+            workflow.checklists.map((block) => (
+              <div className="surface-block" key={block.title}>
+                <span>{block.title}</span>
                 <ul className="clean-list">
                   {block.items.map((item) => (
                     <li key={item}>{item}</li>
                   ))}
                 </ul>
               </div>
-            ))}
-          </div>
-        </Panel>
-
-        <Panel
-          eyebrow="Downstream sync"
-          title="What happens after approval"
-          description="Future React clients should request these outcomes from the backend instead of deriving them locally."
-        >
-          <div className="sync-list">
-            {data.workflow.syncPreview.map((item) => (
-              <div className="sync-item" key={item.label}>
-                <div>
-                  <h3>{item.label}</h3>
-                  <span>{item.target}</span>
-                  <p>{item.detail}</p>
-                </div>
-                <StatusBadge status={item.status} />
-              </div>
-            ))}
-          </div>
-        </Panel>
+            ))
+          ) : (
+            <InlineNotice description="Checklist content is not available." title="No operator checklist" />
+          )}
+        </ActionPanel>
       </div>
-    </>
+
+      <TaskSwitcher activeTaskId={workflow.currentTaskId} items={data.queue} onNavigate={onNavigate} />
+    </div>
   );
 }
+

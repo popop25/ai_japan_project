@@ -1,4 +1,5 @@
-export type ViewId = "dashboard" | "context" | "workflow" | "artifacts";
+﻿export type ViewId = "dashboard" | "context" | "workflow" | "artifacts";
+export type PrototypeScreenState = "ready" | "loading" | "error" | "empty";
 export type WorkflowStatus = "pending" | "in_progress" | "review_requested" | "revision_needed" | "done";
 export type ConnectionStatus = "connected" | "degraded" | "pending";
 export type ArtifactKind = "pm_output" | "critic_review" | "context_snapshot";

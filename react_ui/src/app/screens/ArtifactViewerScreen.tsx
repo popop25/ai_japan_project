@@ -1,131 +1,179 @@
-import { useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 
-import { ProductData, ViewId } from "../../types";
+import { ProductData, PrototypeScreenState, ViewId } from "../../types";
+import { ArtifactSummary } from "../../design-system/components/ArtifactSummary";
+import { FocusBar } from "../../design-system/components/FocusBar";
 import { DocView } from "../../design-system/components/DocView";
-import { Panel } from "../../design-system/components/Panel";
-import { StatusBadge } from "../../design-system/components/StatusBadge";
+import { InlineNotice } from "../../design-system/components/InlineNotice";
+import { ProofPanel } from "../../design-system/components/ProofPanel";
+import { ScreenStatePanel } from "../../design-system/components/ScreenStatePanel";
 import { cx } from "../../utils";
 
 interface ArtifactViewerScreenProps {
   data: ProductData;
   onNavigate: (view: ViewId) => void;
+  state?: PrototypeScreenState;
+  onResetState?: () => void;
 }
 
-export function ArtifactViewerScreen({ data, onNavigate }: ArtifactViewerScreenProps) {
+function recoverFixture(onResetState?: () => void) {
+  if (onResetState) {
+    onResetState();
+    return;
+  }
+
+  if (typeof window !== "undefined") {
+    window.location.reload();
+  }
+}
+
+export function ArtifactViewerScreen({ data, onNavigate, state = "ready", onResetState }: ArtifactViewerScreenProps) {
   const [selectedArtifactId, setSelectedArtifactId] = useState(data.artifacts[0]?.id ?? "");
 
-  const selectedArtifact = useMemo(
-    () => data.artifacts.find((artifact) => artifact.id === selectedArtifactId) ?? data.artifacts[0],
-    [data.artifacts, selectedArtifactId],
-  );
+  useEffect(() => {
+    if (!data.artifacts.length) {
+      if (selectedArtifactId) {
+        setSelectedArtifactId("");
+      }
+      return;
+    }
 
-  const tone =
-    selectedArtifact.kind === "critic_review"
-      ? "warning"
-      : selectedArtifact.kind === "context_snapshot"
-        ? "success"
-        : "brand";
+    if (!data.artifacts.some((artifact) => artifact.id === selectedArtifactId)) {
+      setSelectedArtifactId(data.artifacts[0].id);
+    }
+  }, [data.artifacts, selectedArtifactId]);
+
+  if (state === "loading") {
+    return (
+      <ScreenStatePanel
+        description="Artifact metadata and rendered body are still loading."
+        detail="Keep verdict, summary, and source slots stable while the future artifact endpoint swaps in live data."
+        eyebrow="Artifact Review"
+        highlights={[
+          "Verdict and source should load before long document content if needed.",
+          "Do not reconstruct Critic frontmatter in the client.",
+        ]}
+        title="Loading artifact review"
+        state="loading"
+      />
+    );
+  }
+
+  if (state === "error") {
+    return (
+      <ScreenStatePanel
+        actions={
+          <div className="button-row">
+            <button className="button button--primary" onClick={() => recoverFixture(onResetState)} type="button">
+              Use fixture payload
+            </button>
+            <button className="button button--secondary" onClick={() => onNavigate("workflow")} type="button">
+              Open workflow detail
+            </button>
+          </div>
+        }
+        description="The selected artifact could not be rendered safely."
+        detail="Keep the shell responsive and wait for a canonical artifact payload from the backend."
+        eyebrow="Artifact Review"
+        highlights={[
+          "Artifact parsing remains a backend concern.",
+          "The React client should never reconstruct review metadata on its own.",
+        ]}
+        title="Artifact review unavailable"
+        state="error"
+      />
+    );
+  }
+
+  const selectedArtifact = data.artifacts.find((artifact) => artifact.id === selectedArtifactId) ?? data.artifacts[0] ?? null;
+
+  if (state === "empty" || selectedArtifact === null) {
+    return (
+      <ScreenStatePanel
+        actions={
+          <div className="button-row">
+            <button className="button button--primary" onClick={() => onNavigate("workflow")} type="button">
+              Open workflow detail
+            </button>
+            <button className="button button--secondary" onClick={() => onNavigate("context")} type="button">
+              Review context
+            </button>
+          </div>
+        }
+        description="There are no reviewable artifacts yet."
+        detail="The viewer should guide the operator back to workflow or context when live payloads have not produced a readable draft or review."
+        eyebrow="Artifact Review"
+        highlights={[
+          "No artifacts should render an intentional empty state.",
+          "Document body stays secondary until a real artifact exists.",
+        ]}
+        title="No artifacts available"
+        state="empty"
+      />
+    );
+  }
+
+  const tone = selectedArtifact.kind === "critic_review" ? "warning" : selectedArtifact.kind === "context_snapshot" ? "default" : "brand";
+  const linkedTask = data.queue.find((item) => item.jiraKey === selectedArtifact.linkedTask) ?? data.queue[0] ?? null;
 
   return (
-    <>
-      <Panel
-        tone={tone}
-        eyebrow="Artifact viewer"
-        title="Summary-first artifact review"
-        description={selectedArtifact.summary}
-        badge={<StatusBadge status={selectedArtifact.status} />}
-      >
-        <div className="artifact-selector">
+    <div className="cp-stack cp-stack--xl">
+      {linkedTask ? (
+        <FocusBar
+          currentStage={linkedTask.stage}
+          onPrimaryAction={() => onNavigate("workflow")}
+          onSecondaryAction={() => onNavigate("context")}
+          primaryLabel="Open linked workflow"
+          secondaryLabel="Check source context"
+          task={linkedTask}
+        />
+      ) : null}
+
+      <div className="content-grid content-grid--artifact">
+        <ArtifactSummary artifact={selectedArtifact} title="Verdict / summary / source" />
+        {linkedTask ? <ProofPanel artifact={selectedArtifact} connections={data.connections} task={linkedTask} /> : null}
+      </div>
+
+      <section className="surface surface--brand">
+        <div className="surface__head">
+          <div>
+            <p className="eyebrow">Artifact switcher</p>
+            <h3>Available review targets</h3>
+            <p className="muted">Fixture-backed list. It does not imply a live multi-artifact backend session.</p>
+          </div>
+        </div>
+        <div className="artifact-switcher">
           {data.artifacts.map((artifact) => (
             <button
-              className={cx(
-                "artifact-selector__button",
-                artifact.id === selectedArtifact.id && "artifact-selector__button--active",
-              )}
+              className={cx("artifact-switcher__item", artifact.id === selectedArtifact.id && "artifact-switcher__item--active")}
               key={artifact.id}
               onClick={() => setSelectedArtifactId(artifact.id)}
               type="button"
             >
               <strong>{artifact.title}</strong>
               <span>
-                {artifact.linkedTask} ì¨Œ {artifact.updatedAt}
+                {artifact.linkedTask} ¡¤ {artifact.updatedAt}
               </span>
             </button>
           ))}
         </div>
-      </Panel>
+      </section>
 
-      <div className="screen-grid screen-grid--two-column">
-        <Panel
-          eyebrow="Selected artifact"
+      <section className={`surface ${tone === "default" ? "" : `surface--${tone}`}`.trim()}>
+        <div className="surface__head">
+          <div>
+            <p className="eyebrow">Doc view</p>
+            <h3>Rendered body</h3>
+            <p className="muted">The body is intentionally secondary to verdict, summary, and source traceability.</p>
+          </div>
+        </div>
+        <DocView
+          idPrefix={`artifact-${selectedArtifact.id}`}
+          sections={selectedArtifact.sections}
+          summary={selectedArtifact.summary}
           title={selectedArtifact.title}
-          description="Traceability and readable summary should come before raw markdown."
-          badge={
-            selectedArtifact.verdict ? (
-              <StatusBadge
-                label={selectedArtifact.verdict === "revise" ? "Critic says revise" : "Critic approved"}
-                status={selectedArtifact.verdict === "revise" ? "revision_needed" : "review_requested"}
-              />
-            ) : (
-              <StatusBadge status={selectedArtifact.status} />
-            )
-          }
-        >
-          <div className="detail-grid">
-            <div className="detail-tile">
-              <span>Kind</span>
-              <strong>{selectedArtifact.kind.replace("_", " ")}</strong>
-            </div>
-            <div className="detail-tile">
-              <span>Updated</span>
-              <strong>{selectedArtifact.updatedAt}</strong>
-            </div>
-            <div className="detail-tile">
-              <span>Linked task</span>
-              <strong>{selectedArtifact.linkedTask}</strong>
-            </div>
-          </div>
-
-          <div className="artifact-card__links">
-            {selectedArtifact.externalLinks.map((link) => (
-              <a className="link-pill" href={link.href} key={`${selectedArtifact.id}-${link.label}`} rel="noreferrer" target="_blank">
-                {link.label}
-                <span>{link.system}</span>
-              </a>
-            ))}
-          </div>
-        </Panel>
-
-        <Panel
-          eyebrow="Operator readout"
-          title="What changes because of this artifact"
-          description="The viewer should help the operator decide what to do next, not just display the file."
-        >
-          <div className="callout-list">
-            {selectedArtifact.callouts.map((callout) => (
-              <div className="callout" key={callout}>
-                {callout}
-              </div>
-            ))}
-          </div>
-          <div className="button-stack button-stack--horizontal">
-            <button className="button button--primary" onClick={() => onNavigate("workflow")} type="button">
-              Open linked workflow
-            </button>
-            <button className="button button--secondary" onClick={() => onNavigate("context")} type="button">
-              Check source context
-            </button>
-          </div>
-        </Panel>
-      </div>
-
-      <Panel
-        eyebrow="Document anatomy"
-        title="Readable narrative plus structured detail"
-        description="The same component can render context pages, PM drafts, and Critic reviews without turning them into raw file dumps."
-      >
-        <DocView sections={selectedArtifact.sections} summary={selectedArtifact.summary} title={selectedArtifact.title} />
-      </Panel>
-    </>
+        />
+      </section>
+    </div>
   );
 }
