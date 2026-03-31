@@ -1,122 +1,60 @@
-import { useEffect, useState } from "react";
+﻿import { useState } from "react";
 
-import { DashboardScreen } from "./screens/DashboardScreen";
-import { ContextWorkspaceScreen } from "./screens/ContextWorkspaceScreen";
-import { WorkflowWorkspaceScreen } from "./screens/WorkflowWorkspaceScreen";
-import { ArtifactViewerScreen } from "./screens/ArtifactViewerScreen";
-import { AppShell } from "../design-system/components/AppShell";
-import { productData } from "../data/mockData";
-import { PrototypeScreenState, ViewId } from "../types";
+import { AppShell } from "./product-ux/components/AppShell";
+import { AgentHandoffScreen } from "./product-ux/screens/AgentHandoffScreen";
+import { ContextViewScreen } from "./product-ux/screens/ContextViewScreen";
+import { ReviewResultScreen } from "./product-ux/screens/ReviewResultScreen";
+import { TaskDetailScreen } from "./product-ux/screens/TaskDetailScreen";
+import { TaskInboxWorkboardScreen } from "./product-ux/screens/TaskInboxWorkboardScreen";
+import { productExperience } from "./product-ux/productData";
+import { ProductViewId } from "./product-ux/types";
+import "./product-ux/product.css";
 
-const VIEW_IDS: ViewId[] = ["dashboard", "context", "workflow", "artifacts"];
-const SCREEN_STATE_KEYS = ["dashboard", "workflow", "artifacts"] as const;
-
-type ScreenStateKey = (typeof SCREEN_STATE_KEYS)[number];
-type ScreenStateMap = Record<ScreenStateKey, PrototypeScreenState>;
-
-const DEFAULT_SCREEN_STATES: ScreenStateMap = {
-  dashboard: "ready",
-  workflow: "ready",
-  artifacts: "ready",
-};
-
-function isPrototypeScreenState(value: string | null): value is PrototypeScreenState {
-  return value === "ready" || value === "loading" || value === "error" || value === "empty";
-}
-
-function readViewFromHash(fallback: ViewId = "dashboard"): ViewId {
-  if (typeof window === "undefined") {
-    return fallback;
-  }
-
-  const hash = window.location.hash.replace("#", "");
-  return VIEW_IDS.includes(hash as ViewId) ? (hash as ViewId) : fallback;
-}
-
-function readScreenStatesFromSearch(): ScreenStateMap {
-  if (typeof window === "undefined") {
-    return { ...DEFAULT_SCREEN_STATES };
-  }
-
-  const params = new URLSearchParams(window.location.search);
-  const nextState = { ...DEFAULT_SCREEN_STATES };
-
-  SCREEN_STATE_KEYS.forEach((key) => {
-    const value = params.get(`${key}State`) ?? params.get(key);
-
-    if (isPrototypeScreenState(value)) {
-      nextState[key] = value;
-    }
-  });
-
-  return nextState;
-}
-
-function clearPrototypeStateSearchParams() {
-  if (typeof window === "undefined") {
-    return;
-  }
-
-  const url = new URL(window.location.href);
-
-  SCREEN_STATE_KEYS.forEach((key) => {
-    url.searchParams.delete(key);
-    url.searchParams.delete(`${key}State`);
-  });
-
-  window.history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
-}
+const DEFAULT_VIEW: ProductViewId = "task";
 
 export default function App() {
-  const [currentView, setCurrentView] = useState<ViewId>(() => readViewFromHash("dashboard"));
-  const [screenStates, setScreenStates] = useState<ScreenStateMap>(readScreenStatesFromSearch);
+  const [currentView, setCurrentView] = useState<ProductViewId>(DEFAULT_VIEW);
+  const [selectedTaskId, setSelectedTaskId] = useState(productExperience.tasks[0]?.id ?? "");
+  const activeTask = productExperience.tasks.find((task) => task.id === selectedTaskId) ?? productExperience.tasks[0];
 
-  useEffect(() => {
-    const handleHashChange = () => setCurrentView((previousView) => readViewFromHash(previousView));
-
-    window.addEventListener("hashchange", handleHashChange);
-    return () => window.removeEventListener("hashchange", handleHashChange);
-  }, []);
-
-  const navigate = (view: ViewId) => {
-    window.location.hash = view;
-    setCurrentView(view);
+  const handleSelectTask = (taskId: string) => {
+    setSelectedTaskId(taskId);
+    setCurrentView("task");
   };
 
-  const resetPrototypeStates = () => {
-    setScreenStates({ ...DEFAULT_SCREEN_STATES });
-    clearPrototypeStateSearchParams();
-  };
+  if (!activeTask) {
+    return null;
+  }
 
   return (
     <AppShell
-      connections={productData.connections}
+      currentTask={activeTask}
       currentView={currentView}
-      onNavigate={navigate}
-      overview={productData.overview}
-      queue={productData.queue}
-      workflow={productData.workflow}
+      onSelectTask={handleSelectTask}
+      onViewChange={setCurrentView}
+      product={productExperience}
     >
-      {currentView === "dashboard" ? (
-        <DashboardScreen data={productData} onNavigate={navigate} onResetState={resetPrototypeStates} state={screenStates.dashboard} />
+      {currentView === "workboard" ? (
+        <TaskInboxWorkboardScreen onOpenTask={handleSelectTask} product={productExperience} task={activeTask} />
       ) : null}
-      {currentView === "context" ? <ContextWorkspaceScreen data={productData} onNavigate={navigate} /> : null}
-      {currentView === "workflow" ? (
-        <WorkflowWorkspaceScreen
-          data={productData}
-          onNavigate={navigate}
-          onResetState={resetPrototypeStates}
-          state={screenStates.workflow}
+      {currentView === "task" ? (
+        <TaskDetailScreen
+          onOpenContext={() => setCurrentView("context")}
+          onOpenHandoff={() => setCurrentView("handoff")}
+          product={productExperience}
+          task={activeTask}
         />
       ) : null}
-      {currentView === "artifacts" ? (
-        <ArtifactViewerScreen
-          data={productData}
-          onNavigate={navigate}
-          onResetState={resetPrototypeStates}
-          state={screenStates.artifacts}
-        />
+      {currentView === "handoff" ? (
+        <AgentHandoffScreen onOpenReview={() => setCurrentView("review")} product={productExperience} task={activeTask} />
+      ) : null}
+      {currentView === "review" ? (
+        <ReviewResultScreen onOpenTask={() => setCurrentView("task")} product={productExperience} task={activeTask} />
+      ) : null}
+      {currentView === "context" ? (
+        <ContextViewScreen onOpenTask={() => setCurrentView("task")} product={productExperience} task={activeTask} />
       ) : null}
     </AppShell>
   );
 }
+
