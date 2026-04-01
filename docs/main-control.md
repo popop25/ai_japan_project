@@ -13,13 +13,14 @@ For the current cycle it owns:
 
 We are moving faster by executing this reset in one thread.
 
-## Control Snapshot (2026-04-01)
+## Control Snapshot (2026-04-02)
 
 - Stable baseline: `main@5dee3cc`
-- Active branch for the current cycle: `codex/react-product-ux-reset`
+- Active branch for the current cycle: `main`
 - Current demo surface: `react_ui/`
 - Current product stance: `React-first`, `fixture-based`, `manual handoff`
 - Current design stance: `Light-first`, `Obsidian-led`, `Custom + Radix`
+- Current demo target: `React workspace + personal agent + shared destination preview`
 - Streamlit status: frozen internal fallback
 - Python harness status: still authoritative for future live integration boundaries
 
@@ -36,7 +37,7 @@ Specifically:
 - a user sees the current task
 - the user sees which personal agent is connected
 - the user understands the next action
-- the user sees how the result becomes team share status
+- the user sees how the workflow reaches team share status
 
 ## Operating Rules
 
@@ -54,6 +55,7 @@ Specifically:
 - Task picker and Context are support panels, not separate full screens.
 - The first connection model is `personal_agent`.
 - The demo remains honest: handoff is manual, not automatic.
+- The demo does not require React-side result upload for this cycle.
 - Internal implementation terms must not lead the UI.
   - avoid `packet`
   - avoid `artifact`
@@ -93,6 +95,7 @@ The current reset is complete only when all of the following exist together:
 - reference board locked in `docs/react-demo-reference-board.md`
 - React build passing
 - updated screenshots
+- `docs/react-demo-shot-list.md`
 - updated `README.md`
 - updated `docs/personal-agent-bridge-spec.md`
 

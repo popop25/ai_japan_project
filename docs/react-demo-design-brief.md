@@ -76,7 +76,7 @@ Preferred language:
 
 - `brief prepare`
 - `send to agent`
-- `receive response`
+- `confirm response ready`
 - `request review`
 - `apply review`
 - `prepare team share`

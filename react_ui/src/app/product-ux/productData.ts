@@ -61,12 +61,12 @@ const HANDOFF_MODES: HandoffModeOption[] = [
   {
     id: "copy_paste",
     label: "복사 후 붙여넣기",
-    helper: "브리프를 에이전트 채팅에 붙여넣고, 돌아온 응답을 다시 이 작업 공간에 가져옵니다.",
+    helper: "브리프를 에이전트 채팅에 붙여넣고, 작업이 끝나면 이 화면으로 돌아와 다음 단계를 확인합니다.",
   },
   {
     id: "file_handoff",
     label: "파일 handoff",
-    helper: "브리프 파일 경로를 전달하고, 응답을 파일이나 붙여넣기 형태로 다시 가져옵니다.",
+    helper: "브리프 파일 경로를 전달하고, 결과가 준비되면 이 화면에서 다음 단계를 확인합니다.",
   },
 ];
 
@@ -497,8 +497,8 @@ function nextAction(state: TaskDisplayState): { label: string; detail: string } 
       };
     case "waiting_for_agent":
       return {
-        label: "응답 받기",
-        detail: "handoff가 나간 상태입니다. 돌아온 응답을 다시 작업 공간으로 가져옵니다.",
+        label: "응답 준비됨 확인",
+        detail: "handoff가 나간 상태입니다. 내 에이전트 작업이 끝났는지 확인하고 다음 단계로 넘깁니다.",
       };
     case "response_received":
       return {
@@ -540,13 +540,13 @@ function actionsForState(state: TaskDisplayState): TaskAction[] {
     case "brief_ready":
       return [{ id: "mark_sent", label: "에이전트에 보내기", helper: "브리프를 보내고 응답 대기 상태로 넘깁니다.", kind: "primary", enabled: true }];
     case "waiting_for_agent":
-      return [{ id: "receive_result", label: "응답 받기", helper: "에이전트 응답을 다시 작업 공간으로 가져옵니다.", kind: "primary", enabled: true }];
+      return [{ id: "receive_result", label: "응답 준비됨 확인", helper: "내 에이전트 작업이 끝났는지 확인하고 다음 단계로 진행합니다.", kind: "primary", enabled: true }];
     case "response_received":
-      return [{ id: "request_review", label: "검토 요청", helper: "돌아온 초안을 바탕으로 Critic handoff를 준비합니다.", kind: "primary", enabled: true }];
+      return [{ id: "request_review", label: "검토 요청", helper: "PM 초안을 기준으로 Critic handoff를 준비합니다.", kind: "primary", enabled: true }];
     case "review_requested":
       return [{ id: "mark_sent", label: "에이전트에 보내기", helper: "Critic 브리프를 보내고 검토 결과를 기다립니다.", kind: "primary", enabled: true }];
     case "ready_for_decision":
-      return [{ id: "confirm_share", label: "팀 공유 준비", helper: "Jira와 Confluence의 최종 공유 상태를 확인합니다.", kind: "primary", enabled: true }];
+      return [{ id: "confirm_share", label: "팀 공유 준비", helper: "Jira와 Confluence에 보여줄 최종 공유 상태를 확인합니다.", kind: "primary", enabled: true }];
     case "revise":
       return [{ id: "apply_review", label: "수정 반영", helper: "검토 피드백을 반영해 한 번 더 다듬습니다.", kind: "primary", enabled: true }];
     case "shared":

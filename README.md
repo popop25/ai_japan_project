@@ -11,7 +11,7 @@ The product we are trying to demonstrate is:
 1. Confluence stores project context, decisions, and role instructions.
 2. Jira stores the task lifecycle.
 3. A user connects their own agent for PM and Critic work.
-4. The workspace prepares the next handoff, receives the result, and keeps the flow moving.
+4. The workspace prepares the next handoff, helps the user confirm the next stage after agent work, and keeps the flow moving.
 5. The outcome is prepared for team sharing in Jira and Confluence.
 
 This is not a built-in chatbot. It is workflow infrastructure for role-based agents.
@@ -43,6 +43,7 @@ It proves:
 - the workflow is centered on `task -> handoff -> review/share`
 - PM and Critic are role-based agents, not hard-coded products
 - Jira and Confluence are shown as shared-with-team surfaces
+- the app acts as a workspace for handoff and share confirmation, not as the place where the agent does the work
 
 It does **not** yet prove:
 
@@ -66,7 +67,8 @@ The current demo supports these handoff patterns conceptually:
 - `copy_paste`
 - `file_handoff`
 
-The app prepares the brief and the user performs the actual handoff manually.
+The app prepares the brief and the user performs the actual handoff manually in their own agent.
+The demo then moves forward by confirming the next stage, not by pretending the React app owns the full result-ingest loop.
 
 ## Repository Map
 
@@ -122,6 +124,7 @@ pytest tests -q --basetemp=.tmp_test_runs\pytest
 - [Operations](docs/operations.md)
 - [External agent integration](docs/agent-integration.md)
 - [React demo design brief](docs/react-demo-design-brief.md)
+- [React demo shot list](docs/react-demo-shot-list.md)
 - [React demo reference board](docs/react-demo-reference-board.md)
 - [Personal agent bridge spec](docs/personal-agent-bridge-spec.md)
 - [Main control notes](docs/main-control.md)

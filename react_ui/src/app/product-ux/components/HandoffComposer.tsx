@@ -109,18 +109,18 @@ export function HandoffComposer({ onChangeHandoffMode, onOpenContext, onTriggerA
               </article>
 
               <article className="status-block">
-                <span className="eyebrow">가져올 결과</span>
+                <span className="eyebrow">다음 단계에서 확인할 결과</span>
                 <strong>{task.activeBrief.expectedResponse}</strong>
-                <p>다음 검토 단계로 넘어가기 전에 이 결과를 작업 공간으로 다시 가져와야 합니다.</p>
+                <p>내 에이전트 작업이 끝나면 이 결과가 준비됐는지만 확인하고 다음 단계로 넘어갑니다.</p>
               </article>
 
               <article className="status-block status-block--muted">
                 <span className="eyebrow">수동 handoff</span>
-                <strong>{task.handoffMode === "file_handoff" ? "응답 파일을 다시 가져옵니다." : "돌아온 답변을 다시 붙여넣습니다."}</strong>
+                <strong>{task.handoffMode === "file_handoff" ? "파일 경로로 handoff를 이어갑니다." : "내 에이전트 채팅에서 작업을 이어갑니다."}</strong>
                 <p>
                   {task.handoffMode === "file_handoff"
-                    ? `${task.activeBrief.handoffPath}를 전달하고, ${task.activeBrief.responsePath}를 다시 가져옵니다.`
-                    : "브리프를 자신의 에이전트 채팅에 붙여넣고, 응답이 준비되면 다시 이어서 진행합니다."}
+                    ? `${task.activeBrief.handoffPath}를 전달한 뒤, 결과가 준비되면 이 작업 공간으로 돌아와 다음 단계를 확인합니다.`
+                    : "브리프를 자신의 에이전트 채팅에 붙여넣고, 작업이 끝나면 이 작업 공간으로 돌아와 다음 단계를 확인합니다."}
                 </p>
               </article>
             </div>

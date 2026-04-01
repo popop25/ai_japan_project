@@ -18,7 +18,7 @@ If project context is already structured, the workspace should help the user:
 1. open the current task
 2. prepare the right brief for the current role
 3. send that brief to their own agent
-4. receive the result
+4. confirm that the agent work is ready for the next stage
 5. move to review and team sharing
 
 The current demo expresses this promise through a 3-step workspace:
@@ -45,7 +45,7 @@ The current demo expresses this promise through a 3-step workspace:
 
 - chooses the task
 - decides how to hand off to the agent
-- receives the result back into the workspace
+- confirms the next stage in the workspace after agent work
 - makes the final share decision
 
 ## Supported Connection Modes
@@ -54,13 +54,13 @@ The current demo expresses this promise through a 3-step workspace:
 
 - the app prepares the brief
 - the user copies it into their agent chat
-- the user pastes the result back into the workflow
+- the user returns to the workspace and confirms the next stage after the agent work
 
 ### `file_handoff`
 
 - the app prepares the brief and a file path
 - the user hands the file path to their agent
-- the user brings the result back as a file or paste-back step
+- the user returns to the workspace and confirms the next stage after the agent work
 
 The current React demo shows both modes explicitly.
 
@@ -89,7 +89,7 @@ Use these front-stage labels:
 
 - `brief ready`
 - `send to agent`
-- `receive response`
+- `confirm response ready`
 - `request review`
 - `apply review`
 - `prepare team share`
@@ -130,10 +130,10 @@ Those remain implementation details.
 3. The user opens `Agent Handoff`.
 4. The workspace shows the brief, the selected handoff mode, and the expected response.
 5. The user sends the brief to their PM agent.
-6. The user receives the PM result.
+6. The user completes the PM work in their own agent and returns to the workspace.
 7. The workspace moves to Critic review.
 8. The user sends the Critic brief to their Critic agent.
-9. The user receives the review.
+9. The user completes the Critic review in their own agent and returns to the workspace.
 10. The workspace shows `ready_for_decision` or `revise`.
 11. The operator decides whether to share or revise.
 12. The resulting state is prepared for Jira and Confluence team sharing.
