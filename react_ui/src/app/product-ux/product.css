@@ -443,6 +443,13 @@ ul {
   gap: var(--space-3);
 }
 
+.workboard-item__title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
 .agent-list__meta,
 .share-state__detail {
   display: flex;

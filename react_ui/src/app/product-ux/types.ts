@@ -109,6 +109,7 @@ export interface TaskBriefTemplate {
 
 export interface TaskRecord {
   id: string;
+  isPrimaryDemo: boolean;
   title: string;
   account: string;
   summary: string;

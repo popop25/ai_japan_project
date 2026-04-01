@@ -17,6 +17,7 @@ import {
 
 interface TaskScenario {
   id: string;
+  isPrimaryDemo: boolean;
   title: string;
   account: string;
   summary: string;
@@ -110,6 +111,7 @@ const agentMap = new Map(AGENTS.map((agent) => [agent.id, agent]));
 const SCENARIOS: TaskScenario[] = [
   {
     id: "task-japan-launch",
+    isPrimaryDemo: true,
     title: "Japan launch brief",
     account: "AI Japan launch",
     summary: "Prepare one short launch brief the retail team can review before tomorrow's planning check-in.",
@@ -119,7 +121,7 @@ const SCENARIOS: TaskScenario[] = [
     initialState: "brief_ready",
     initialRole: "pm",
     initialHandoffMode: "copy_paste",
-    reviewOutcomeState: "revise",
+    reviewOutcomeState: "ready_for_decision",
     connectedAgentIds: ["pm-agent", "critic-agent", "ops-agent"],
     pmBrief: {
       roleId: "pm",
@@ -223,6 +225,7 @@ Output
   },
   {
     id: "task-pricing-impact",
+    isPrimaryDemo: false,
     title: "Pricing change note",
     account: "Billing update",
     summary: "The PM brief has already been sent. We are waiting for the response before we ask for review.",
@@ -331,6 +334,7 @@ Review the impact note and answer:
   },
   {
     id: "task-retro-share",
+    isPrimaryDemo: false,
     title: "Store ops retro share",
     account: "Post-launch ops",
     summary: "The review is done. This task is now about the operator's final share decision and the team-facing summary.",
@@ -661,6 +665,7 @@ function createTaskRecord(scenario: TaskScenario, runtime: TaskRuntime): TaskRec
 
   return {
     id: scenario.id,
+    isPrimaryDemo: scenario.isPrimaryDemo,
     title: scenario.title,
     account: scenario.account,
     summary: scenario.summary,

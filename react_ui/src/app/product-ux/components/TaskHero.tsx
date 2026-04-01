@@ -6,6 +6,18 @@ interface TaskHeroProps {
   task: TaskRecord;
 }
 
+function primaryCtaLabel(task: TaskRecord): string {
+  if (task.displayState === "not_started") {
+    return "Brief 준비";
+  }
+
+  if (task.displayState === "brief_ready") {
+    return "Handoff 열기";
+  }
+
+  return task.nextActionLabel;
+}
+
 export function TaskHero({ onContinue, onOpenContext, task }: TaskHeroProps) {
   const leadAgent = task.connectedAgents.find((agent) => agent.roleId === task.activeRole) ?? task.connectedAgents[0];
   const shareSnapshot = task.shareStatuses[0];
@@ -60,7 +72,7 @@ export function TaskHero({ onContinue, onOpenContext, task }: TaskHeroProps) {
 
         <div className="task-document__actions">
           <button className="button button--primary button--wide" onClick={onContinue} type="button">
-            {task.nextActionLabel}
+            {primaryCtaLabel(task)}
           </button>
           <button className="button button--secondary" onClick={onOpenContext} type="button">
             Open context

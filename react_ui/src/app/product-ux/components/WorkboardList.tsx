@@ -7,6 +7,8 @@ interface WorkboardListProps {
 }
 
 export function WorkboardList({ activeTaskId, onSelectTask, tasks }: WorkboardListProps) {
+  const orderedTasks = [...tasks].sort((left, right) => Number(right.isPrimaryDemo) - Number(left.isPrimaryDemo));
+
   return (
     <section className="drawer-panel">
       <div className="section-heading section-heading--row">
@@ -18,7 +20,7 @@ export function WorkboardList({ activeTaskId, onSelectTask, tasks }: WorkboardLi
       </div>
 
       <div className="workboard-list">
-        {tasks.map((task) => {
+        {orderedTasks.map((task) => {
           const shareSnapshot = task.shareStatuses[0];
 
           return (
@@ -29,7 +31,10 @@ export function WorkboardList({ activeTaskId, onSelectTask, tasks }: WorkboardLi
               type="button"
             >
               <div className="workboard-item__topline">
-                <strong>{task.title}</strong>
+                <div className="workboard-item__title">
+                  <strong>{task.title}</strong>
+                  {task.isPrimaryDemo ? <span className="state-chip state-chip--primary">Demo path</span> : null}
+                </div>
                 <span className="state-chip state-chip--neutral">{task.stageLabel}</span>
               </div>
               <p>{task.summary}</p>

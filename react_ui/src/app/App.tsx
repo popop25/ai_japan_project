@@ -9,7 +9,7 @@ import { HandoffMode, ProductViewId, TaskActionId } from "./product-ux/types";
 import "./product-ux/product.css";
 
 export default function App() {
-  const initialTask = initialProductExperience.tasks[0];
+  const initialTask = initialProductExperience.tasks.find((task) => task.isPrimaryDemo) ?? initialProductExperience.tasks[0];
   const [product, setProduct] = useState(initialProductExperience);
   const [selectedTaskId, setSelectedTaskId] = useState(initialTask?.id ?? "");
   const [currentView, setCurrentView] = useState<ProductViewId>(initialTask ? preferredViewForTask(initialTask) : "task");
