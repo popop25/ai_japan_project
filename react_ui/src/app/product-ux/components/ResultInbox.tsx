@@ -19,32 +19,29 @@ function resultStatusLabel(status: TaskRecord["results"][number]["status"]) {
 
 export function ResultInbox({ task }: ResultInboxProps) {
   return (
-    <section className="panel panel--muted">
-      <div className="section-heading section-heading--row">
-        <div>
-          <span className="eyebrow">Latest results</span>
-          <h3>What came back from the agents</h3>
-        </div>
-        <span className="counter">{task.results.length}</span>
-      </div>
+    <section className="review-results">
+      <div className="section-header">Returned items</div>
 
-      <div className="result-list">
+      <div className="result-document-list">
         {task.results.length > 0 ? (
           task.results.map((result) => (
-            <article key={result.id} className="result-item">
-              <div className="result-item__topline">
-                <strong>{result.title}</strong>
+            <article key={result.id} className="result-document-item">
+              <div className="result-document-item__topline">
+                <div>
+                  <span className="prop-label">Returned by</span>
+                  <div className="result-document-item__title">{result.title}</div>
+                </div>
                 <span className={`state-chip state-chip--${result.status}`}>{resultStatusLabel(result.status)}</span>
               </div>
-              <p>{result.summary}</p>
-              <div className="result-item__meta">
+              <p className="prop-value muted">{result.summary}</p>
+              <div className="result-document-item__meta">
                 <span>{result.fromAgentLabel}</span>
                 <span>{result.updatedAt}</span>
               </div>
             </article>
           ))
         ) : (
-          <article className="result-item result-item--empty">
+          <article className="result-document-item result-document-item--empty">
             <strong>No response has been received yet.</strong>
             <p>The workspace is still waiting for the next result to come back from your agent.</p>
           </article>

@@ -1,84 +1,73 @@
 import { TaskRecord } from "../types";
 
 interface TaskHeroProps {
-  onContinue: () => void;
-  onOpenContext: () => void;
   task: TaskRecord;
 }
 
-function primaryCtaLabel(task: TaskRecord): string {
-  if (task.displayState === "not_started") {
-    return "Brief 준비";
-  }
-
-  if (task.displayState === "brief_ready") {
-    return "Handoff 열기";
-  }
-
-  return task.nextActionLabel;
+function taskReference(task: TaskRecord): string {
+  return task.sources.find((source) => source.type === "Jira")?.title ?? task.id.toUpperCase();
 }
 
-export function TaskHero({ onContinue, onOpenContext, task }: TaskHeroProps) {
-  const leadAgent = task.connectedAgents.find((agent) => agent.roleId === task.activeRole) ?? task.connectedAgents[0];
-  const shareSnapshot = task.shareStatuses[0];
-
+export function TaskHero({ task }: TaskHeroProps) {
   return (
-    <section className="task-layout">
-      <article className="panel task-document">
-        <div className="section-heading section-heading--row">
-          <div>
-            <span className="eyebrow">Task</span>
-            <h2>{task.title}</h2>
-          </div>
-          <span className="state-chip state-chip--attention">{task.urgency}</span>
+    <>
+      <header className="title-block">
+        <div className="eyebrow-row">
+          <span className="task-id">{taskReference(task)}</span>
+          <span className="status-pill">
+            <span className="status-dot" />
+            {task.stageLabel}
+          </span>
+          <span className="sprint-tag">{task.dueLabel}</span>
         </div>
 
-        <p className="task-document__summary">{task.objective}</p>
+        <h2 className="task-h1">{task.title}</h2>
+        <p className="task-desc">{task.objective}</p>
+      </header>
 
-        <div className="task-document__grid">
-          <div className="task-document__narrative">
-            <div className="note-block">
-              <span className="eyebrow">Why this matters now</span>
-              <p>{task.summary}</p>
-            </div>
+      <section className="col-main">
+        <div className="section-header">Task context</div>
 
-            <div className="note-block">
-              <span className="eyebrow">Next action</span>
-              <strong>{task.nextActionLabel}</strong>
-              <p>{task.nextActionDetail}</p>
-            </div>
-          </div>
+        <div className="props">
+          <article className="prop">
+            <div className="prop-label">Project</div>
+            <div className="prop-value">{task.account}</div>
+          </article>
 
-          <aside className="task-document__aside">
-            <article className="signal-block">
-              <span className="eyebrow">Connected agent</span>
-              <strong>{leadAgent ? `${leadAgent.roleLabel} / ${leadAgent.name}` : "No active agent"}</strong>
-              <p>{leadAgent?.responsibility ?? "Choose the role that should continue the task."}</p>
+          <div className="prop-divider" />
+
+          {task.contextEntries.map((entry) => (
+            <article key={entry.id} className="prop">
+              <div className="prop-label">{entry.label}</div>
+              <div className="prop-value muted">{entry.value}</div>
             </article>
+          ))}
 
-            <article className="signal-block signal-block--muted">
-              <span className="eyebrow">Shared with team</span>
-              <strong>{shareSnapshot?.label ?? "Not staged yet"}</strong>
-              <p>{shareSnapshot?.detail ?? "The share state will appear after review and operator confirmation."}</p>
-            </article>
+          <div className="prop-divider" />
 
-            <div className="stacked-meta">
-              <span>Account / {task.account}</span>
-              <span>Due / {task.dueLabel}</span>
-              <span>Updated / {task.updatedAt}</span>
+          <article className="prop">
+            <div className="prop-label">Output expectation</div>
+            <div className="prop-value">{task.activeBrief.expectedResponse}</div>
+            <div className="prop-value muted">Shared with the team once the operator confirms the final step.</div>
+          </article>
+
+          <div className="prop-divider" />
+
+          <article className="prop">
+            <div className="prop-label">Reference notes</div>
+            <div className="file-list">
+              {task.sources.map((source) => (
+                <article key={source.id} className="file-row">
+                  <span className="file-icon">{source.type === "Confluence" ? "DOC" : source.type === "Jira" ? "JIRA" : "NOTE"}</span>
+                  <span className="file-name">{source.title}</span>
+                  <span className="file-meta">{source.freshness}</span>
+                  <span className="file-arrow">&gt;</span>
+                </article>
+              ))}
             </div>
-          </aside>
+          </article>
         </div>
-
-        <div className="task-document__actions">
-          <button className="button button--primary button--wide" onClick={onContinue} type="button">
-            {primaryCtaLabel(task)}
-          </button>
-          <button className="button button--secondary" onClick={onOpenContext} type="button">
-            Open context
-          </button>
-        </div>
-      </article>
-    </section>
+      </section>
+    </>
   );
 }

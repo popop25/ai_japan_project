@@ -5,35 +5,35 @@ interface ReviewSummaryProps {
 }
 
 export function ReviewSummary({ task }: ReviewSummaryProps) {
-  const outcomeLabel = task.reviewOutcomeState === "revise" ? "Revise needed" : "Operator decision needed";
-
   return (
-    <section className="panel review-summary">
-      <div className="section-heading section-heading--row">
-        <div>
-          <span className="eyebrow">Review & Share</span>
-          <h2>{task.reviewHeadline}</h2>
-        </div>
-        <span className={`state-chip ${task.reviewOutcomeState === "revise" ? "state-chip--attention" : "state-chip--primary"}`}>
-          {outcomeLabel}
-        </span>
-      </div>
+    <section className="review-document">
+      <div className="section-header">Review summary</div>
 
-      <p className="task-document__summary">{task.reviewSummary}</p>
+      <div className="props props--compact">
+        <article className="prop">
+          <div className="prop-label">Review outcome</div>
+          <div className="prop-value">{task.reviewHeadline}</div>
+          <div className="prop-value muted">{task.reviewSummary}</div>
+        </article>
 
-      <div className="decision-card">
-        <span className="eyebrow">Operator decision</span>
-        <strong>{task.operatorDecisionLabel}</strong>
-        <p>{task.operatorDecisionDetail}</p>
-      </div>
+        <div className="prop-divider" />
 
-      <div className="checklist-block">
-        <span className="eyebrow">Before the next step</span>
-        <ul>
+        <article className="prop">
+          <div className="prop-label">Operator decision</div>
+          <div className="prop-value">{task.operatorDecisionLabel}</div>
+          <div className="prop-value muted">{task.operatorDecisionDetail}</div>
+        </article>
+
+        <div className="prop-divider" />
+
+        <article className="prop">
+          <div className="prop-label">Before team share</div>
+          <ul className="review-checklist">
           {task.reviewChecklist.map((item) => (
             <li key={item}>{item}</li>
           ))}
-        </ul>
+          </ul>
+        </article>
       </div>
     </section>
   );

@@ -5,44 +5,63 @@ interface SourceOfTruthPanelProps {
 }
 
 export function SourceOfTruthPanel({ task }: SourceOfTruthPanelProps) {
+  const teamDestinations = task.sources.filter((source) => source.type === "Jira" || source.type === "Confluence");
+  const isShared = task.displayState === "shared";
+
   return (
-    <section className="panel share-panel">
-      <div className="section-heading">
-        <span className="eyebrow">Shared with team</span>
-        <h3>Jira and Confluence status</h3>
-      </div>
-
-      <div className="share-panel__states">
-        {task.shareStatuses.map((status) => (
-          <article key={status.system} className={`share-state share-state--${status.tone}`}>
-            <div>
-              <strong>{status.system}</strong>
-              <p>{status.label}</p>
-            </div>
-            <div className="share-state__detail">
-              <span>{status.detail}</span>
-              <small>{status.updatedAt}</small>
-            </div>
-          </article>
-        ))}
-      </div>
-
-      <div className="source-section">
-        <span className="eyebrow">Source notes</span>
-        <div className="source-list">
-          {task.sources.map((source) => (
-            <article key={source.id} className="source-item">
-              <div>
-                <strong>{source.title}</strong>
-                <p>
-                  {source.type} / {source.freshness}
-                </p>
+    <div className="aside-stack">
+      <section className="aside-section">
+        <div className="aside-label">Shared with team</div>
+        <div className="share-rail">
+          {task.shareStatuses.map((status) => (
+            <article key={status.system} className={`share-rail-card share-rail-card--${status.tone}`}>
+              <div className="share-rail-card__header">
+                <strong>{status.system}</strong>
+                <span className={`state-chip state-chip--${status.tone === "healthy" ? "connected" : status.tone}`}>{status.label}</span>
               </div>
-              <span>{source.note}</span>
+              <p>{status.detail}</p>
+              <span className="share-rail-card__updated">{status.updatedAt}</span>
             </article>
           ))}
         </div>
-      </div>
-    </section>
+      </section>
+
+      <section className="aside-section">
+        <div className="aside-label">Share destinations</div>
+        <div className="destination-list">
+          {(teamDestinations.length > 0 ? teamDestinations : task.sources).map((source) => (
+            <article key={source.id} className="destination-card">
+              <div className="destination-card__topline">
+                <span className="prop-label">{source.type}</span>
+                <span className="file-meta">{source.freshness}</span>
+              </div>
+              <strong>{source.title}</strong>
+              <p>{source.note}</p>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      <section className="aside-section">
+        <div className="aside-label">Workflow</div>
+        <div className="wf-list">
+          <div className="wf-row">
+            <span className="wf-num">01</span>
+            <span className="wf-name">Task</span>
+            <span className="wf-marker">Done</span>
+          </div>
+          <div className="wf-row">
+            <span className="wf-num">02</span>
+            <span className="wf-name">Agent Handoff</span>
+            <span className="wf-marker">Done</span>
+          </div>
+          <div className={isShared ? "wf-row complete" : "wf-row current"}>
+            <span className="wf-num">03</span>
+            <span className="wf-name">Review &amp; Share</span>
+            <span className="wf-marker">{isShared ? "Done" : "Now"}</span>
+          </div>
+        </div>
+      </section>
+    </div>
   );
 }

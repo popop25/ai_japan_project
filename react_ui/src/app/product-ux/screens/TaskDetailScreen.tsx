@@ -4,15 +4,16 @@ import { TaskRecord } from "../types";
 
 interface TaskDetailScreenProps {
   onContinue: () => void;
-  onOpenContext: () => void;
   task: TaskRecord;
 }
 
-export function TaskDetailScreen({ onContinue, onOpenContext, task }: TaskDetailScreenProps) {
+export function TaskDetailScreen({ onContinue, task }: TaskDetailScreenProps) {
   return (
-    <div className="screen-stack">
-      <TaskHero onContinue={onContinue} onOpenContext={onOpenContext} task={task} />
-      <AgentConnectionPanel task={task} />
+    <div className="task-screen">
+      <TaskHero task={task} />
+      <aside className="col-aside">
+        <AgentConnectionPanel onContinue={onContinue} task={task} />
+      </aside>
     </div>
   );
 }

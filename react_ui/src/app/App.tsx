@@ -85,7 +85,7 @@ export default function App() {
       taskPickerOpen={taskPickerOpen}
     >
       {currentView === "task" ? (
-        <TaskDetailScreen onContinue={handleOpenCurrentStage} onOpenContext={() => setContextOpen(true)} task={activeTask} />
+        <TaskDetailScreen onContinue={handleOpenCurrentStage} task={activeTask} />
       ) : null}
 
       {currentView === "handoff" ? (

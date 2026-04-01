@@ -620,8 +620,12 @@ function reviewCopyForState(scenario: TaskScenario, state: TaskDisplayState) {
     summary: scenario.reviewCopy.readySummary,
     outcomeState: "ready_for_decision" as const,
     operatorDecisionLabel: "Operator decision required",
-    operatorDecisionDetail: "The Critic review is complete, but the operator still decides whether to share now or revise first.",
-    reviewChecklist: ["Check whether the summary is team-ready.", "Confirm Jira and Confluence should show the same message.", "Decide whether to share now or revise once more."],
+    operatorDecisionDetail: "The Critic review is complete. Confirm the share step once the summary and team-facing destination look right.",
+    reviewChecklist: [
+      "Check whether the summary is team-ready.",
+      "Confirm Jira and Confluence should show the same message.",
+      "Prepare the final team-share update.",
+    ],
   };
 }
 

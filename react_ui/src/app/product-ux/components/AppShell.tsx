@@ -5,10 +5,10 @@ import { ProductExperience, ProductViewId, TaskRecord } from "../types";
 import { ContextPanel } from "./ContextPanel";
 import { WorkboardList } from "./WorkboardList";
 
-const STAGES: Array<{ id: ProductViewId; label: string; helper: string }> = [
-  { id: "task", label: "Task", helper: "Confirm the task, the agent, and the next move." },
-  { id: "handoff", label: "Agent Handoff", helper: "Send the brief and wait for the response." },
-  { id: "review", label: "Review & Share", helper: "Review the result and confirm the team share state." },
+const STAGES: Array<{ id: ProductViewId; label: string }> = [
+  { id: "task", label: "Task" },
+  { id: "handoff", label: "Agent Handoff" },
+  { id: "review", label: "Review & Share" },
 ];
 
 interface AppShellProps {
@@ -23,10 +23,6 @@ interface AppShellProps {
   taskPickerOpen: boolean;
 }
 
-function stageIndex(view: ProductViewId): number {
-  return STAGES.findIndex((stage) => stage.id === view);
-}
-
 export function AppShell({
   children,
   currentTask,
@@ -38,81 +34,56 @@ export function AppShell({
   contextOpen,
   taskPickerOpen,
 }: AppShellProps) {
-  const leadAgent = currentTask.connectedAgents.find((agent) => agent.roleId === currentTask.activeRole) ?? currentTask.connectedAgents[0];
-  const shareSnapshot = currentTask.shareStatuses[0];
-  const activeStageIndex = stageIndex(currentView);
+  const visibleAgents = currentTask.connectedAgents.filter((agent) => agent.roleId !== "ops").slice(0, 2);
 
   return (
     <div className="app-shell">
-      <header className="app-shell__header">
-        <div className="app-shell__brand">
-          <span className="eyebrow">{product.workspaceLabel}</span>
-          <h1>{product.title}</h1>
-          <p>{product.workspaceTagline}</p>
+      <header className="topbar">
+        <div className="topbar__brand">
+          <span className="logo">{product.title}</span>
+          <div className="topbar-sep" />
+          <span className="project-crumb">{product.workspaceLabel}</span>
         </div>
 
-        <div className="app-shell__controls">
-          <button className="button button--secondary" onClick={() => onTaskPickerOpenChange(true)} type="button">
+        <div className="topbar-right">
+          {visibleAgents.map((agent) => (
+            <div key={agent.id} className="agent-chip">
+              <span className="chip-dot" />
+              {agent.name} / {agent.roleLabel.replace(" Agent", "")}
+            </div>
+          ))}
+          <button className="utility-btn" onClick={() => onTaskPickerOpenChange(true)} type="button">
             Task picker
           </button>
-          <button className="button button--secondary" onClick={() => onContextOpenChange(true)} type="button">
+          <button className="utility-btn" onClick={() => onContextOpenChange(true)} type="button">
             Context
           </button>
         </div>
       </header>
 
-      <section className="app-shell__focus panel">
-        <div className="app-shell__focus-copy">
-          <span className="eyebrow">Current task</span>
-          <h2>{currentTask.title}</h2>
-          <p>{currentTask.summary}</p>
-        </div>
+      <nav className="stepnav" aria-label="Workflow stages">
+        {STAGES.map((stage, index) => (
+          <div className="stepnav__group" key={stage.id}>
+            <button className={stage.id === currentView ? "step-btn active" : "step-btn"} type="button">
+              <span className="step-num">{String(index + 1).padStart(2, "0")}</span>
+              {stage.label}
+            </button>
+            {index < STAGES.length - 1 ? <span className="step-sep">&gt;</span> : null}
+          </div>
+        ))}
+      </nav>
 
-        <div className="app-shell__focus-meta">
-          <article className="meta-block">
-            <span className="eyebrow">Current stage</span>
-            <strong>{currentTask.stageLabel}</strong>
-            <p>{currentTask.nextActionDetail}</p>
-          </article>
-          <article className="meta-block">
-            <span className="eyebrow">Connected agent</span>
-            <strong>{leadAgent ? `${leadAgent.roleLabel} / ${leadAgent.name}` : "No agent selected"}</strong>
-            <p>{leadAgent?.statusNote ?? "Connect an agent for the current role."}</p>
-          </article>
-          <article className="meta-block meta-block--muted">
-            <span className="eyebrow">Shared with team</span>
-            <strong>{shareSnapshot?.label ?? "Not staged yet"}</strong>
-            <p>{shareSnapshot?.detail ?? "The team-share state will appear once the task moves forward."}</p>
-          </article>
-        </div>
-      </section>
+      <div className="page-wrap">
+        <main className="stage-canvas">{children}</main>
 
-      <section className="stage-strip" aria-label="Workflow stages">
-        {STAGES.map((stage, index) => {
-          const stateClass =
-            index < activeStageIndex ? "stage-chip is-complete" : index === activeStageIndex ? "stage-chip is-current" : "stage-chip";
-
-          return (
-            <article key={stage.id} className={stateClass}>
-              <span className="stage-chip__index">{index + 1}</span>
-              <div>
-                <strong>{stage.label}</strong>
-                <p>{stage.helper}</p>
-              </div>
-            </article>
-          );
-        })}
-      </section>
-
-      <main className="stage-canvas">{children}</main>
-
-      <footer className="panel panel--muted demo-note">
-        <span className="eyebrow">Demo scope</span>
-        <p>
-          This demo is fixture-based and honest about manual handoff. The workspace prepares the next move, and the user uses
-          their own agent to complete the step.
-        </p>
-      </footer>
+        <footer className="demo-note">
+          <span className="eyebrow">Demo scope</span>
+          <p>
+            This demo stays honest about manual handoff. The workspace prepares the next move, and the user uses their own
+            agent to continue the work.
+          </p>
+        </footer>
+      </div>
 
       <Dialog.Root open={taskPickerOpen} onOpenChange={onTaskPickerOpenChange}>
         <Dialog.Portal>

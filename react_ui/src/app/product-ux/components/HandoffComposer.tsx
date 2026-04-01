@@ -9,27 +9,64 @@ interface HandoffComposerProps {
   task: TaskRecord;
 }
 
+function taskReference(task: TaskRecord): string {
+  return task.sources.find((source) => source.type === "Jira")?.title ?? task.id.toUpperCase();
+}
+
 export function HandoffComposer({ onChangeHandoffMode, onOpenContext, onTriggerAction, task }: HandoffComposerProps) {
   const primaryAction = task.actions.find((action) => action.kind === "primary");
   const activeAgent = task.connectedAgents.find((agent) => agent.roleId === task.activeBrief.roleId) ?? task.connectedAgents[0];
 
   return (
-    <section className="handoff-layout">
-      <article className="panel handoff-document">
-        <div className="section-heading section-heading--row">
-          <div>
-            <span className="eyebrow">Agent handoff</span>
-            <h2>{task.activeBrief.title}</h2>
-          </div>
-          <span className="state-chip state-chip--primary">{task.stageLabel}</span>
+    <section className="handoff-screen">
+      <header className="title-block">
+        <div className="eyebrow-row">
+          <span className="task-id">{taskReference(task)}</span>
+          <span className="status-pill">
+            <span className="status-dot" />
+            {task.stageLabel}
+          </span>
+          <span className="sprint-tag">{task.activeBrief.roleLabel}</span>
         </div>
 
-        <p className="task-document__summary">{task.activeBrief.instruction}</p>
+        <h2 className="task-h1">{task.activeBrief.title}</h2>
+        <p className="task-desc">{task.activeBrief.instruction}</p>
+      </header>
 
-        <div className="handoff-document__body">
-          <span className="eyebrow">Brief</span>
+      <section className="col-main">
+        <div className="section-header">Brief to send</div>
+
+        <article className="handoff-doc-sheet">
           <pre className="handoff-brief-body">{task.activeBrief.body}</pre>
-        </div>
+        </article>
+
+        <section className="handoff-subsection">
+          <div className="section-header">Response expectation</div>
+          <div className="props props--compact">
+            <article className="prop">
+              <div className="prop-label">Expected response</div>
+              <div className="prop-value">{task.activeBrief.expectedResponse}</div>
+            </article>
+
+            <div className="prop-divider" />
+
+            <article className="prop">
+              <div className="prop-label">Before you send</div>
+              <ul className="review-checklist review-checklist--compact">
+                {task.activeBrief.checklist.map((item) => (
+                  <li key={item}>{item}</li>
+                ))}
+              </ul>
+            </article>
+
+            <div className="prop-divider" />
+
+            <article className="prop">
+              <div className="prop-label">Context included</div>
+              <div className="prop-value muted">{task.activeBrief.contextIncluded.join(", ")}</div>
+            </article>
+          </div>
+        </section>
 
         <div className="task-document__actions">
           {primaryAction ? (
@@ -41,52 +78,53 @@ export function HandoffComposer({ onChangeHandoffMode, onOpenContext, onTriggerA
             Open context
           </button>
         </div>
-      </article>
+      </section>
 
-      <aside className="panel handoff-side">
-        <div className="section-heading">
-          <span className="eyebrow">Handoff mode</span>
-          <h3>Choose how you will send this brief</h3>
-        </div>
+      <aside className="col-aside">
+        <div className="aside-stack">
+          <section className="aside-section">
+            <div className="aside-label">Handoff mode</div>
+            <RadioGroup.Root className="mode-selector" onValueChange={(value) => onChangeHandoffMode(value as HandoffMode)} value={task.handoffMode}>
+              {task.handoffModeOptions.map((mode) => (
+                <label key={mode.id} className="mode-option">
+                  <RadioGroup.Item className="mode-option__control" value={mode.id}>
+                    <RadioGroup.Indicator className="mode-option__indicator" />
+                  </RadioGroup.Item>
+                  <div className="mode-option__copy">
+                    <strong>{mode.label}</strong>
+                    <span>{mode.helper}</span>
+                  </div>
+                </label>
+              ))}
+            </RadioGroup.Root>
+          </section>
 
-        <RadioGroup.Root className="mode-selector" onValueChange={(value) => onChangeHandoffMode(value as HandoffMode)} value={task.handoffMode}>
-          {task.handoffModeOptions.map((mode) => (
-            <label key={mode.id} className="mode-option">
-              <RadioGroup.Item className="mode-option__control" value={mode.id}>
-                <RadioGroup.Indicator className="mode-option__indicator" />
-              </RadioGroup.Item>
-              <div className="mode-option__copy">
-                <strong>{mode.label}</strong>
-                <span>{mode.helper}</span>
-              </div>
-            </label>
-          ))}
-        </RadioGroup.Root>
+          <section className="aside-section">
+            <div className="aside-label">Send with</div>
+            <div className="status-block-list">
+              <article className="status-block">
+                <span className="eyebrow">Active agent</span>
+                <strong>{activeAgent ? `${activeAgent.name} / ${activeAgent.productLabel}` : task.activeBrief.roleLabel}</strong>
+                <p>{activeAgent?.statusNote ?? "Use your connected agent for this role."}</p>
+              </article>
 
-        <div className="status-block-list">
-          <article className="status-block">
-            <span className="eyebrow">Send with</span>
-            <strong>{activeAgent ? `${activeAgent.name} / ${activeAgent.productLabel}` : task.activeBrief.roleLabel}</strong>
-            <p>{activeAgent?.statusNote ?? "Use your connected agent for this role."}</p>
-          </article>
+              <article className="status-block">
+                <span className="eyebrow">Bring back</span>
+                <strong>{task.activeBrief.expectedResponse}</strong>
+                <p>Return with the result before moving to review or the next decision.</p>
+              </article>
 
-          <article className="status-block">
-            <span className="eyebrow">Context included</span>
-            <strong>{task.activeBrief.contextIncluded.join(", ")}</strong>
-            <p>The workspace has already narrowed the context to what this role needs.</p>
-          </article>
-
-          <article className="status-block">
-            <span className="eyebrow">Expected response</span>
-            <strong>{task.activeBrief.expectedResponse}</strong>
-            <p>Bring the response back here before moving to the next stage.</p>
-          </article>
-
-          <article className="status-block status-block--muted">
-            <span className="eyebrow">{task.handoffMode === "file_handoff" ? "File path" : "Paste-back"}</span>
-            <strong>{task.handoffMode === "file_handoff" ? task.activeBrief.handoffPath : task.activeBrief.responsePath}</strong>
-            <p>The handoff stays manual in this demo, on purpose.</p>
-          </article>
+              <article className="status-block status-block--muted">
+                <span className="eyebrow">Manual handoff</span>
+                <strong>{task.handoffMode === "file_handoff" ? "Return with the saved response file." : "Paste the returned reply back into the workspace."}</strong>
+                <p>
+                  {task.handoffMode === "file_handoff"
+                    ? `Use the brief file path and bring back ${task.activeBrief.responsePath}.`
+                    : "Paste this brief into your own agent chat, then continue once the response is ready."}
+                </p>
+              </article>
+            </div>
+          </section>
         </div>
       </aside>
     </section>
