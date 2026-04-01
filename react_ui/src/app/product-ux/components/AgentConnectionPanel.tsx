@@ -1,47 +1,46 @@
-﻿import { AgentRecord, TaskRecord } from "../types";
+import { TaskRecord } from "../types";
 
 interface AgentConnectionPanelProps {
-  agents: AgentRecord[];
   task: TaskRecord;
 }
 
-export function AgentConnectionPanel({ agents, task }: AgentConnectionPanelProps) {
-  const connectedAgents = agents.filter((agent) => task.agentIds.includes(agent.id));
+function statusLabel(status: TaskRecord["connectedAgents"][number]["status"]) {
+  switch (status) {
+    case "connected":
+      return "Connected";
+    case "reviewing":
+      return "Waiting";
+    case "waiting":
+      return "Standby";
+    default:
+      return status;
+  }
+}
 
+export function AgentConnectionPanel({ task }: AgentConnectionPanelProps) {
   return (
-    <section className="agent-panel">
-      <div className="agent-panel__header">
-        <div>
-          <span className="agent-kicker">Connected agent</span>
-          <h3>이 task에 연결된 역할</h3>
-        </div>
+    <section className="panel panel--muted">
+      <div className="section-heading">
+        <span className="eyebrow">Connected agents</span>
+        <h3>Who is attached to this workflow</h3>
       </div>
-      <div className="agent-connection-list">
-        {connectedAgents.map((agent) => (
-          <article key={agent.id} className="agent-connection-card">
-            <div className="agent-connection-card__topline">
-              <strong>{agent.name}</strong>
-              <span className={`agent-status agent-status--${agent.status}`}>{agent.status}</span>
+
+      <div className="agent-list">
+        {task.connectedAgents.map((agent) => (
+          <article key={agent.id} className="agent-list__item">
+            <div>
+              <strong>{agent.roleLabel}</strong>
+              <p>
+                {agent.name} / {agent.productLabel}
+              </p>
             </div>
-            <p>{agent.role}</p>
-            <dl>
-              <div>
-                <dt>Focus</dt>
-                <dd>{agent.focus}</dd>
-              </div>
-              <div>
-                <dt>Queue</dt>
-                <dd>{agent.queueDepth}</dd>
-              </div>
-              <div>
-                <dt>Latency</dt>
-                <dd>{agent.latency}</dd>
-              </div>
-            </dl>
+            <div className="agent-list__meta">
+              <span className={`state-chip state-chip--${agent.status}`}>{statusLabel(agent.status)}</span>
+              <small>{agent.statusNote}</small>
+            </div>
           </article>
         ))}
       </div>
     </section>
   );
 }
-

@@ -1,220 +1,831 @@
-﻿import { ProductExperience } from "./types";
+import {
+  AgentRecord,
+  AgentRoleId,
+  ConnectedAgentRecord,
+  HandoffMode,
+  HandoffModeOption,
+  ProductExperience,
+  ProductViewId,
+  ResultItem,
+  ShareStatus,
+  TaskAction,
+  TaskActionId,
+  TaskBriefTemplate,
+  TaskDisplayState,
+  TaskRecord,
+} from "./types";
 
-export const productExperience: ProductExperience = {
-  title: "Connected Agent Workspace",
-  subtitle: "프로젝트 맥락을 읽은 내 에이전트가 다음 행동으로 이어서 일하는 작업 공간",
-  workspaceLabel: "Tokyo GTM launch prep",
-  agents: [
-    {
-      id: "pm-agent",
-      name: "PM Agent",
-      role: "요구 정리와 실행 브리프 작성",
-      focus: "launch task framing",
-      status: "connected",
-      connectedSince: "2m ago",
-      queueDepth: 2,
-      latency: "14s"
+interface TaskScenario {
+  id: string;
+  title: string;
+  account: string;
+  summary: string;
+  objective: string;
+  dueLabel: string;
+  urgency: string;
+  initialState: TaskDisplayState;
+  initialRole: AgentRoleId;
+  initialHandoffMode: HandoffMode;
+  reviewOutcomeState: "ready_for_decision" | "revise";
+  connectedAgentIds: string[];
+  pmBrief: TaskBriefTemplate;
+  criticBrief: TaskBriefTemplate;
+  pmResult: ResultItem;
+  criticResult?: ResultItem;
+  contextEntries: TaskRecord["contextEntries"];
+  sources: TaskRecord["sources"];
+  shareStates: {
+    working: ShareStatus[];
+    ready: ShareStatus[];
+    shared: ShareStatus[];
+  };
+  reviewCopy: {
+    reviseHeadline: string;
+    reviseSummary: string;
+    readyHeadline: string;
+    readySummary: string;
+    sharedHeadline: string;
+    sharedSummary: string;
+  };
+}
+
+interface TaskRuntime {
+  displayState: TaskDisplayState;
+  activeRole: AgentRoleId;
+  handoffMode: HandoffMode;
+  updatedAt: string;
+}
+
+const HANDOFF_MODES: HandoffModeOption[] = [
+  {
+    id: "copy_paste",
+    label: "Copy and paste",
+    helper: "Copy the brief into your agent chat and paste the response back here.",
+  },
+  {
+    id: "file_handoff",
+    label: "File handoff",
+    helper: "Send the brief as a file path and bring the response back as a file or paste-back.",
+  },
+];
+
+const AGENTS: AgentRecord[] = [
+  {
+    id: "pm-agent",
+    name: "My Codex",
+    roleId: "pm",
+    roleLabel: "PM Agent",
+    responsibility: "Drafts the first brief the team can react to.",
+    productLabel: "Codex",
+    focus: "brief drafting",
+    status: "connected",
+    statusNote: "Connected and ready for the next PM handoff.",
+  },
+  {
+    id: "critic-agent",
+    name: "My Claude",
+    roleId: "critic",
+    roleLabel: "Critic Agent",
+    responsibility: "Checks clarity, missing decisions, and share readiness.",
+    productLabel: "Claude",
+    focus: "quality review",
+    status: "connected",
+    statusNote: "Connected for review once the PM draft is back.",
+  },
+  {
+    id: "ops-agent",
+    name: "Workspace sync",
+    roleId: "ops",
+    roleLabel: "Ops Agent",
+    responsibility: "Prepares the final Jira and Confluence share state.",
+    productLabel: "Workspace",
+    focus: "team share",
+    status: "waiting",
+    statusNote: "Waiting for the operator to confirm the share step.",
+  },
+];
+
+const agentMap = new Map(AGENTS.map((agent) => [agent.id, agent]));
+
+const SCENARIOS: TaskScenario[] = [
+  {
+    id: "task-japan-launch",
+    title: "Japan launch brief",
+    account: "AI Japan launch",
+    summary: "Prepare one short launch brief the retail team can review before tomorrow's planning check-in.",
+    objective: "Confirm the scope, missing owners, and the next decision before we send a first draft to the team.",
+    dueLabel: "Today, 18:00 KST",
+    urgency: "Needs a draft before today's review",
+    initialState: "brief_ready",
+    initialRole: "pm",
+    initialHandoffMode: "copy_paste",
+    reviewOutcomeState: "revise",
+    connectedAgentIds: ["pm-agent", "critic-agent", "ops-agent"],
+    pmBrief: {
+      roleId: "pm",
+      roleLabel: "PM Agent",
+      title: "Japan launch PM brief",
+      instruction: "Prepare a concise launch brief the team can react to in one read.",
+      body: `# Japan launch PM brief
+
+Goal
+- Summarize the launch scope in one paragraph.
+- Call out missing owners or blockers.
+- End with the one decision we still need before team share.
+
+Output
+- One draft brief
+- One short list of open questions`,
+      checklist: [
+        "State the launch goal and scope clearly.",
+        "Separate missing owners from open blockers.",
+        "End with the single next decision the team needs.",
+      ],
+      expectedResponse: "One brief draft and one list of open questions",
+      contextIncluded: ["03_Context summary", "launch decision note", "current Jira task state"],
+      handoffPath: "project/runs/japan-launch-brief.md",
+      responsePath: "launch-brief-response.md",
     },
-    {
-      id: "critic-agent",
-      name: "Critic",
-      role: "리스크와 누락 검토",
-      focus: "decision quality",
-      status: "reviewing",
-      connectedSince: "live",
-      queueDepth: 1,
-      latency: "28s"
+    criticBrief: {
+      roleId: "critic",
+      roleLabel: "Critic Agent",
+      title: "Japan launch review brief",
+      instruction: "Review the PM draft for missing owners, blockers, and whether it is ready for team share.",
+      body: `# Japan launch Critic brief
+
+Review the PM draft and answer:
+- What is still missing before we share this with the team?
+- Is the summary clear enough for operators and PMs?
+- Should we share now, or revise once more?
+
+Output
+- Verdict: ready_for_decision or revise
+- Summary
+- Recommended changes`,
+      checklist: [
+        "Call out missing owners or blocked decisions.",
+        "Check whether the brief can be shared now.",
+        "Recommend the operator's next move.",
+      ],
+      expectedResponse: "A short review verdict and recommended changes",
+      contextIncluded: ["PM draft", "launch goal", "team share expectation"],
+      handoffPath: "project/runs/japan-launch-review.md",
+      responsePath: "launch-review-response.md",
     },
-    {
-      id: "ops-agent",
-      name: "Ops Agent",
-      role: "Jira / Confluence 반영",
-      focus: "team share sync",
-      status: "waiting",
-      connectedSince: "ready",
-      queueDepth: 0,
-      latency: "6s"
-    }
-  ],
-  tasks: [
-    {
-      id: "task-launch-brief",
-      title: "일본 런치 brief 정리",
-      account: "AI Japan rollout",
-      stage: "Draft in progress",
-      summary: "한국 PM 메모와 기존 launch plan을 합쳐 일본 론치용 brief 초안을 만드는 작업입니다.",
-      objective: "PM Agent가 바로 읽고 초안을 만들 수 있게 핵심 맥락, 미정 항목, 공유 상태를 한 화면에서 정리합니다.",
-      nextActionLabel: "PM 에이전트에 보내기",
-      nextActionDetail: "launch timeline, localization open issues, shared-with-team 상태를 포함해 handoff를 보냅니다.",
-      dueLabel: "오늘 18:00 KST",
-      updatedAt: "5 min ago",
-      urgency: "오늘 팀 공유 전 검토 필요",
-      agentIds: ["pm-agent", "critic-agent", "ops-agent"],
-      handoffTargetId: "pm-agent",
-      handoffTitle: "Japan launch brief 초안 요청",
-      handoffInstruction: "프로젝트 맥락과 최신 Jira ticket을 읽고, launch goal, open question, next owner를 포함한 1차 brief를 만들어 주세요.",
-      reviewHeadline: "Critic이 launch risk 3건을 표시했습니다.",
-      reviewSummary: "timeline dependency와 legal copy owner가 비어 있어 팀 공유 전에 수정이 필요합니다.",
-      actionLabels: ["PM 에이전트에 보내기", "초안 받기", "Critic에 검토 요청", "검토 결과 반영"],
-      shareStatuses: [
-        {
-          system: "Jira",
-          label: "shared with team",
-          detail: "LAUNCH-142에 최신 objective 동기화됨",
-          tone: "healthy"
-        },
-        {
-          system: "Confluence",
-          label: "share update needed",
-          detail: "review 반영 후 publish 예정",
-          tone: "attention"
-        }
-      ],
-      results: [
-        {
-          id: "result-brief-v1",
-          title: "Brief draft v1",
-          fromAgentId: "pm-agent",
-          summary: "launch goal, audience, milestones, unresolved owner 포함",
-          status: "ready",
-          updatedAt: "8 min ago"
-        },
-        {
-          id: "result-critic-v1",
-          title: "Critic review",
-          fromAgentId: "critic-agent",
-          summary: "dependency risk와 team share mismatch 3건 표시",
-          status: "review",
-          updatedAt: "3 min ago"
-        }
-      ],
-      contextEntries: [
-        { id: "ctx-1", label: "Goal", value: "일본 시장용 launch brief를 오늘 안에 공유 가능한 수준으로 정리" },
-        { id: "ctx-2", label: "Primary risk", value: "legal review owner와 in-market timeline이 아직 확정되지 않음" },
-        { id: "ctx-3", label: "Team expectation", value: "Jira와 Confluence 둘 다 같은 결론으로 업데이트되어야 함" }
-      ],
-      decisions: [
-        { id: "dec-1", label: "launch goal 문구 고정", rationale: "sales deck와 동일한 표현을 유지", state: "locked" },
-        { id: "dec-2", label: "legal owner 확인", rationale: "팀 공유 전에 owner 누락 방지", state: "next" },
-        { id: "dec-3", label: "Confluence publish timing", rationale: "Critic review 반영 후 공개", state: "watching" }
-      ],
-      sources: [
-        { id: "src-1", title: "Q2 launch narrative", type: "Confluence", freshness: "updated today", note: "시장별 메시지 차이 포함" },
-        { id: "src-2", title: "LAUNCH-142", type: "Jira", freshness: "synced 12 min ago", note: "owner, due date, blockers 확인 가능" },
-        { id: "src-3", title: "Japan PM notes", type: "Workspace note", freshness: "captured yesterday", note: "현지화 요청과 미정 항목 메모" }
-      ]
+    pmResult: {
+      id: "result-japan-launch-draft",
+      title: "Launch brief draft v1",
+      fromAgentLabel: "My Codex",
+      summary: "Drafted a one-page brief with launch scope, open owner gaps, and one final share decision.",
+      status: "ready",
+      updatedAt: "Just now",
     },
-    {
-      id: "task-pricing-check",
-      title: "가격 정책 변경 검토",
-      account: "Billing update",
-      stage: "Waiting for review",
-      summary: "가격 변경안이 onboarding flow와 충돌하는지 확인하고 팀 공유용 summary를 준비합니다.",
-      objective: "Critic과 Ops Agent까지 연결해 pricing change impact를 빠르게 정리합니다.",
-      nextActionLabel: "Critic에 검토 요청",
-      nextActionDetail: "impact summary를 검토 보내고 Jira 상태를 shared with team으로 유지합니다.",
-      dueLabel: "내일 11:00 JST",
-      updatedAt: "16 min ago",
-      urgency: "세일즈 FAQ 영향 확인",
-      agentIds: ["critic-agent", "ops-agent"],
-      handoffTargetId: "critic-agent",
-      handoffTitle: "Pricing impact review 요청",
-      handoffInstruction: "pricing tier 변경이 onboarding copy, FAQ, sales handoff에 미치는 영향만 압축해서 표시해 주세요.",
-      reviewHeadline: "Review 대기 중입니다.",
-      reviewSummary: "초안은 준비됐고 Critic의 영향도 점검만 남아 있습니다.",
-      actionLabels: ["Critic에 검토 요청", "검토 결과 반영", "팀 공유 상태 확인"],
-      shareStatuses: [
-        {
-          system: "Jira",
-          label: "shared with team",
-          detail: "BILL-88에 impact note 기록됨",
-          tone: "healthy"
-        },
-        {
-          system: "Confluence",
-          label: "draft only",
-          detail: "FAQ 정리 후 게시 예정",
-          tone: "pending"
-        }
-      ],
-      results: [
-        {
-          id: "result-pricing-summary",
-          title: "Impact summary",
-          fromAgentId: "pm-agent",
-          summary: "FAQ와 trial messaging 변경 포인트 정리",
-          status: "ready",
-          updatedAt: "20 min ago"
-        }
-      ],
-      contextEntries: [
-        { id: "ctx-4", label: "Customer concern", value: "trial 전환 메시지와 세일즈 자료가 동시에 바뀌어야 함" },
-        { id: "ctx-5", label: "Open owner", value: "FAQ 문구 승인 담당이 확정되지 않음" }
-      ],
-      decisions: [
-        { id: "dec-4", label: "FAQ 갱신 범위", rationale: "trial과 annual plan만 우선 반영", state: "locked" },
-        { id: "dec-5", label: "sales enablement note", rationale: "Confluence publish 전에 별도 정리 필요", state: "next" }
-      ],
-      sources: [
-        { id: "src-4", title: "Pricing proposal", type: "Workspace doc", freshness: "updated 1h ago", note: "변경 배경과 표준 문구" },
-        { id: "src-5", title: "BILL-88", type: "Jira", freshness: "synced 20 min ago", note: "approval 흐름 포함" }
-      ]
+    criticResult: {
+      id: "result-japan-launch-review",
+      title: "Launch brief review",
+      fromAgentLabel: "My Claude",
+      summary: "One owner gap and one schedule dependency still need to be clarified before team share.",
+      status: "review",
+      updatedAt: "Just now",
     },
+    contextEntries: [
+      { id: "japan-goal", label: "Goal", value: "Share one clear brief the launch squad can align on before tomorrow's planning review." },
+      { id: "japan-gap", label: "Open gap", value: "Legal owner and store rollout dependency are still not fully confirmed." },
+      { id: "japan-share", label: "Share expectation", value: "Jira and Confluence should show the same next action for the launch team." },
+    ],
+    sources: [
+      { id: "japan-source-context", title: "03_Context", type: "Confluence", freshness: "Updated today", note: "Launch constraints and scope guardrails" },
+      { id: "japan-source-task", title: "KAN-9", type: "Jira", freshness: "Updated 12 min ago", note: "Current task owner and due date" },
+      { id: "japan-source-note", title: "Launch operator notes", type: "Workspace note", freshness: "Revised this morning", note: "Missing owner and team-share criteria" },
+    ],
+    shareStates: {
+      working: [
+        { system: "Jira", label: "Share note is still being prepared", detail: "The task is active, but the team-facing update has not been posted yet.", tone: "healthy", updatedAt: "2 min ago" },
+        { system: "Confluence", label: "Draft not shared yet", detail: "The share page is still waiting for a reviewed draft.", tone: "pending", updatedAt: "Not posted yet" },
+      ],
+      ready: [
+        { system: "Jira", label: "Ready for team-share confirmation", detail: "The latest draft and review are connected to the task and ready for operator confirmation.", tone: "healthy", updatedAt: "Just now" },
+        { system: "Confluence", label: "Share page waiting for decision", detail: "The page is prepared, but the operator still needs to decide whether to share or revise.", tone: "attention", updatedAt: "Decision pending" },
+      ],
+      shared: [
+        { system: "Jira", label: "Shared with the team", detail: "The latest summary and next action are visible from the task.", tone: "healthy", updatedAt: "Just now" },
+        { system: "Confluence", label: "Shared with the team", detail: "The brief is now published for the launch squad to read in one place.", tone: "healthy", updatedAt: "Just now" },
+      ],
+    },
+    reviewCopy: {
+      reviseHeadline: "One more revision pass is still needed.",
+      reviseSummary: "The review found one missing owner and one schedule dependency, so we should tighten the draft before team share.",
+      readyHeadline: "The final team-share decision is ready.",
+      readySummary: "The review is complete and only the operator's share decision is left.",
+      sharedHeadline: "The latest version is already shared.",
+      sharedSummary: "Jira and Confluence now show the same summary and the same next action.",
+    },
+  },
+  {
+    id: "task-pricing-impact",
+    title: "Pricing change note",
+    account: "Billing update",
+    summary: "The PM brief has already been sent. We are waiting for the response before we ask for review.",
+    objective: "Use one short note to explain how the pricing change affects FAQ wording and customer-facing copy.",
+    dueLabel: "Tomorrow, 11:00 JST",
+    urgency: "Support copy needs a same-day update",
+    initialState: "waiting_for_agent",
+    initialRole: "pm",
+    initialHandoffMode: "file_handoff",
+    reviewOutcomeState: "ready_for_decision",
+    connectedAgentIds: ["pm-agent", "critic-agent", "ops-agent"],
+    pmBrief: {
+      roleId: "pm",
+      roleLabel: "PM Agent",
+      title: "Pricing impact PM brief",
+      instruction: "Summarize the customer-facing impact of the pricing change in one short team note.",
+      body: `# Pricing impact PM brief
+
+Goal
+- Explain what changed in the pricing package.
+- Highlight what support and PM need to update.
+- Call out any owner or FAQ wording that still needs a decision.
+
+Output
+- One short impact note
+- One list of open follow-ups`,
+      checklist: [
+        "Separate customer-facing wording from internal owner follow-up.",
+        "Note the FAQ change clearly.",
+        "End with the one thing support still needs.",
+      ],
+      expectedResponse: "One short impact note and one follow-up list",
+      contextIncluded: ["pricing proposal", "FAQ draft", "customer messaging guidance"],
+      handoffPath: "project/runs/pricing-impact-brief.md",
+      responsePath: "pricing-impact-response.md",
+    },
+    criticBrief: {
+      roleId: "critic",
+      roleLabel: "Critic Agent",
+      title: "Pricing impact review brief",
+      instruction: "Check whether the impact note is clear enough for team share and whether any owner is still missing.",
+      body: `# Pricing impact Critic brief
+
+Review the impact note and answer:
+- Is the note clear enough to share with support and PM?
+- Are any owners or FAQ actions still missing?
+- Should we share now, or revise first?`,
+      checklist: [
+        "Check clarity for support and PM readers.",
+        "Call out missing owners or FAQ gaps.",
+        "Recommend share now or revise.",
+      ],
+      expectedResponse: "A share verdict and one short review summary",
+      contextIncluded: ["PM note", "FAQ draft", "pricing proposal"],
+      handoffPath: "project/runs/pricing-impact-review.md",
+      responsePath: "pricing-impact-review.md",
+    },
+    pmResult: {
+      id: "result-pricing-impact-draft",
+      title: "Pricing impact note",
+      fromAgentLabel: "My Codex",
+      summary: "Summarized wording changes, FAQ impact, and the owner follow-up still needed before broadcast.",
+      status: "ready",
+      updatedAt: "7 min ago",
+    },
+    criticResult: {
+      id: "result-pricing-impact-review",
+      title: "Pricing impact review",
+      fromAgentLabel: "My Claude",
+      summary: "The note is readable for the team. One FAQ owner check is still worth confirming, but it is ready for operator decision.",
+      status: "review",
+      updatedAt: "3 min ago",
+    },
+    contextEntries: [
+      { id: "pricing-goal", label: "Goal", value: "Give PM and support one aligned summary they can use without re-reading the entire proposal." },
+      { id: "pricing-gap", label: "Open gap", value: "The FAQ owner is still not final, but the wording direction is stable." },
+      { id: "pricing-share", label: "Share expectation", value: "The team should see the same summary in both Jira and Confluence." },
+    ],
+    sources: [
+      { id: "pricing-source-proposal", title: "Pricing proposal", type: "Workspace note", freshness: "Updated this morning", note: "Change summary and rationale" },
+      { id: "pricing-source-task", title: "BILL-88", type: "Jira", freshness: "Updated 20 min ago", note: "Owner confirmation and due date" },
+      { id: "pricing-source-faq", title: "Support FAQ draft", type: "Confluence", freshness: "Draft only", note: "Still waiting for final publish" },
+    ],
+    shareStates: {
+      working: [
+        { system: "Jira", label: "Waiting for the agent response", detail: "The brief is out. Jira will be updated once the response comes back.", tone: "pending", updatedAt: "16 min ago" },
+        { system: "Confluence", label: "No team page yet", detail: "A share page has not been prepared because the note is still in progress.", tone: "pending", updatedAt: "Not posted yet" },
+      ],
+      ready: [
+        { system: "Jira", label: "Ready for share decision", detail: "The impact note and review are attached to the task context for the operator to confirm.", tone: "healthy", updatedAt: "3 min ago" },
+        { system: "Confluence", label: "Draft share page is staged", detail: "The note can be published as soon as the operator confirms the share step.", tone: "attention", updatedAt: "Decision pending" },
+      ],
+      shared: [
+        { system: "Jira", label: "Shared with the team", detail: "The task now shows the final impact summary and the next action.", tone: "healthy", updatedAt: "Just now" },
+        { system: "Confluence", label: "Shared with the team", detail: "The support-facing note is published in the shared workspace.", tone: "healthy", updatedAt: "Just now" },
+      ],
+    },
+    reviewCopy: {
+      reviseHeadline: "The draft still needs one more pass.",
+      reviseSummary: "The review found a wording or owner gap that makes team share too early.",
+      readyHeadline: "This note is ready for the final share decision.",
+      readySummary: "The review is complete and the remaining work is operator confirmation.",
+      sharedHeadline: "The note has already been shared.",
+      sharedSummary: "The latest pricing update is visible in both Jira and Confluence.",
+    },
+  },
+  {
+    id: "task-retro-share",
+    title: "Store ops retro share",
+    account: "Post-launch ops",
+    summary: "The review is done. This task is now about the operator's final share decision and the team-facing summary.",
+    objective: "Share the retro summary in a form the launch squad can act on immediately next week.",
+    dueLabel: "Friday, 17:00 KST",
+    urgency: "Needs to go out this week",
+    initialState: "ready_for_decision",
+    initialRole: "ops",
+    initialHandoffMode: "copy_paste",
+    reviewOutcomeState: "ready_for_decision",
+    connectedAgentIds: ["pm-agent", "critic-agent", "ops-agent"],
+    pmBrief: {
+      roleId: "pm",
+      roleLabel: "PM Agent",
+      title: "Retro summary PM brief",
+      instruction: "Turn the retro notes into one short summary the team can act on next week.",
+      body: `# Retro summary PM brief
+
+Goal
+- Keep only action-oriented takeaways.
+- Attach owners where needed.
+- End with the next move for next week.`,
+      checklist: [
+        "Keep the note short and action-led.",
+        "Attach owners where needed.",
+        "End with next week's follow-up.",
+      ],
+      expectedResponse: "A one-page retro summary",
+      contextIncluded: ["retro notes", "follow-up task list", "share criteria"],
+      handoffPath: "project/runs/retro-summary.md",
+      responsePath: "retro-summary-response.md",
+    },
+    criticBrief: {
+      roleId: "critic",
+      roleLabel: "Critic Agent",
+      title: "Retro review brief",
+      instruction: "Check if the retro summary is clear enough to share and whether any action owner is still missing.",
+      body: `# Retro Critic brief
+
+Review the retro summary and answer:
+- Is the next action clear enough for the launch squad?
+- Are any owners missing?
+- Should we share now or revise first?`,
+      checklist: [
+        "Check missing owners.",
+        "Check clarity of next action.",
+        "Recommend share now or revise.",
+      ],
+      expectedResponse: "A share verdict and one review summary",
+      contextIncluded: ["retro summary", "follow-up actions", "team share criteria"],
+      handoffPath: "project/runs/retro-review.md",
+      responsePath: "retro-review-response.md",
+    },
+    pmResult: {
+      id: "result-retro-summary",
+      title: "Retro summary",
+      fromAgentLabel: "My Codex",
+      summary: "Condensed the retro into owner-linked actions and one follow-up focus for next week.",
+      status: "ready",
+      updatedAt: "34 min ago",
+    },
+    criticResult: {
+      id: "result-retro-review",
+      title: "Retro review",
+      fromAgentLabel: "My Claude",
+      summary: "The summary is ready for the operator's final decision before team share.",
+      status: "review",
+      updatedAt: "27 min ago",
+    },
+    contextEntries: [
+      { id: "retro-goal", label: "Goal", value: "Share one retro note the launch squad can turn into follow-up work immediately." },
+      { id: "retro-gap", label: "Open gap", value: "The last pass is about phrasing and share timing, not content discovery." },
+      { id: "retro-share", label: "Share expectation", value: "Jira and Confluence should show the same summary and follow-up focus." },
+    ],
+    sources: [
+      { id: "retro-source-notes", title: "Retro raw notes", type: "Workspace note", freshness: "Written this week", note: "Original meeting notes and follow-up items" },
+      { id: "retro-source-page", title: "Retro publish page", type: "Confluence", freshness: "Draft saved", note: "Waiting for final share confirmation" },
+      { id: "retro-source-followups", title: "Launch follow-up list", type: "Jira", freshness: "Reference", note: "Related execution tasks" },
+    ],
+    shareStates: {
+      working: [
+        { system: "Jira", label: "Reference links only", detail: "The follow-up tickets are linked, but the summary has not been shared yet.", tone: "pending", updatedAt: "Reference only" },
+        { system: "Confluence", label: "Draft page only", detail: "The retro page exists, but it is still a draft.", tone: "attention", updatedAt: "Draft only" },
+      ],
+      ready: [
+        { system: "Jira", label: "Ready for team share", detail: "The follow-up task list and the retro summary are ready to be shown together.", tone: "healthy", updatedAt: "5 min ago" },
+        { system: "Confluence", label: "Waiting for final confirmation", detail: "The retro page is ready to publish as soon as the operator confirms the share step.", tone: "attention", updatedAt: "Decision pending" },
+      ],
+      shared: [
+        { system: "Jira", label: "Shared with the team", detail: "The retro summary now points the squad to the same next action in Jira.", tone: "healthy", updatedAt: "Just now" },
+        { system: "Confluence", label: "Shared with the team", detail: "The published retro note is now available to the full launch squad.", tone: "healthy", updatedAt: "Just now" },
+      ],
+    },
+    reviewCopy: {
+      reviseHeadline: "This still needs one final revision.",
+      reviseSummary: "One wording issue is still large enough that we should revise before team share.",
+      readyHeadline: "The final share decision is ready.",
+      readySummary: "The review is complete. The only remaining step is the operator's share decision.",
+      sharedHeadline: "The summary is already shared.",
+      sharedSummary: "Jira and Confluence now show the same retro summary and follow-up direction.",
+    },
+  },
+];
+
+const INITIAL_RUNTIME: Record<string, TaskRuntime> = Object.fromEntries(
+  SCENARIOS.map((scenario) => [
+    scenario.id,
     {
-      id: "task-retro-share",
-      title: "retro note 팀 공유",
-      account: "Post-launch ops",
-      stage: "Ready to share",
-      summary: "지난주 retro 메모를 에이전트가 읽고 action-oriented summary로 바꾼 뒤 팀에 공유합니다.",
-      objective: "action item, owner, next step을 붙인 상태로 Confluence에 남깁니다.",
-      nextActionLabel: "검토 결과 반영",
-      nextActionDetail: "Critic 코멘트를 정리하고 Confluence를 shared with team 상태로 바꿉니다.",
-      dueLabel: "이번 주 금요일",
-      updatedAt: "32 min ago",
-      urgency: "retro action owner 확정 필요",
-      agentIds: ["pm-agent", "ops-agent"],
-      handoffTargetId: "ops-agent",
-      handoffTitle: "retro summary publish 요청",
-      handoffInstruction: "확정된 action item만 남기고 팀이 바로 읽을 수 있는 summary 형식으로 Confluence에 반영해 주세요.",
-      reviewHeadline: "publish 가능한 상태입니다.",
-      reviewSummary: "minor wording만 정리하면 팀 공유 가능합니다.",
-      actionLabels: ["검토 결과 반영", "팀 공유 상태 확인", "Confluence에 반영"],
-      shareStatuses: [
-        {
-          system: "Jira",
-          label: "reference only",
-          detail: "related ticket 없음",
-          tone: "pending"
-        },
-        {
-          system: "Confluence",
-          label: "shared with team",
-          detail: "retro page 초안 저장됨",
-          tone: "healthy"
-        }
-      ],
-      results: [
-        {
-          id: "result-retro-summary",
-          title: "Retro summary",
-          fromAgentId: "pm-agent",
-          summary: "action item 4건과 owner 제안 포함",
-          status: "ready",
-          updatedAt: "34 min ago"
-        }
-      ],
-      contextEntries: [
-        { id: "ctx-6", label: "Audience", value: "Japan launch squad 전체" },
-        { id: "ctx-7", label: "Must keep", value: "실행 가능한 action item만 남기기" }
-      ],
-      decisions: [
-        { id: "dec-6", label: "owner 명시 유지", rationale: "retro가 실행으로 이어지게 하기 위함", state: "locked" }
-      ],
-      sources: [
-        { id: "src-6", title: "Retro raw notes", type: "Workspace note", freshness: "captured last week", note: "발화 원문 포함" },
-        { id: "src-7", title: "Retro publish page", type: "Confluence", freshness: "draft saved", note: "final wording만 남음" }
-      ]
-    }
-  ]
+      displayState: scenario.initialState,
+      activeRole: scenario.initialRole,
+      handoffMode: scenario.initialHandoffMode,
+      updatedAt: "Just now",
+    },
+  ]),
+);
+
+function scenarioById(taskId: string): TaskScenario {
+  const scenario = SCENARIOS.find((item) => item.id === taskId);
+  if (!scenario) {
+    throw new Error(`Unknown task scenario: ${taskId}`);
+  }
+
+  return scenario;
+}
+
+function statusLabel(state: TaskDisplayState): string {
+  switch (state) {
+    case "not_started":
+      return "Not started";
+    case "brief_ready":
+      return "Brief ready";
+    case "waiting_for_agent":
+      return "Waiting for response";
+    case "response_received":
+      return "Response received";
+    case "review_requested":
+      return "Review brief ready";
+    case "ready_for_decision":
+      return "Decision needed";
+    case "revise":
+      return "Revise";
+    case "shared":
+      return "Shared";
+    default:
+      return "In progress";
+  }
+}
+
+function nextAction(state: TaskDisplayState): { label: string; detail: string } {
+  switch (state) {
+    case "not_started":
+      return {
+        label: "Brief ready",
+        detail: "Prepare the brief before you hand the task to your agent.",
+      };
+    case "brief_ready":
+      return {
+        label: "Send to agent",
+        detail: "The brief is ready. Send it to your agent to start the draft.",
+      };
+    case "waiting_for_agent":
+      return {
+        label: "Receive response",
+        detail: "The handoff is out. Bring the response back into the workspace.",
+      };
+    case "response_received":
+      return {
+        label: "Request review",
+        detail: "The draft is back. Prepare the next handoff for the Critic agent.",
+      };
+    case "review_requested":
+      return {
+        label: "Send to agent",
+        detail: "The Critic brief is ready. Send it and wait for the review.",
+      };
+    case "ready_for_decision":
+      return {
+        label: "Prepare team share",
+        detail: "Review is complete. Confirm the final share state for Jira and Confluence.",
+      };
+    case "revise":
+      return {
+        label: "Apply review",
+        detail: "Tighten the draft with the review feedback, then send it once more.",
+      };
+    case "shared":
+      return {
+        label: "Check share status",
+        detail: "The task has been shared. Confirm that the team sees the same final summary.",
+      };
+    default:
+      return {
+        label: "Continue",
+        detail: "Move the task to the next stage.",
+      };
+  }
+}
+
+function actionsForState(state: TaskDisplayState): TaskAction[] {
+  switch (state) {
+    case "not_started":
+      return [{ id: "prepare_brief", label: "Brief ready", helper: "Organize the brief for the next handoff.", kind: "primary", enabled: true }];
+    case "brief_ready":
+      return [{ id: "mark_sent", label: "Send to agent", helper: "Send the brief and move to waiting.", kind: "primary", enabled: true }];
+    case "waiting_for_agent":
+      return [{ id: "receive_result", label: "Receive response", helper: "Bring the agent response back into the workspace.", kind: "primary", enabled: true }];
+    case "response_received":
+      return [{ id: "request_review", label: "Request review", helper: "Prepare the Critic handoff from the returned draft.", kind: "primary", enabled: true }];
+    case "review_requested":
+      return [{ id: "mark_sent", label: "Send to agent", helper: "Send the Critic brief and wait for the review.", kind: "primary", enabled: true }];
+    case "ready_for_decision":
+      return [{ id: "confirm_share", label: "Prepare team share", helper: "Confirm the final share state for Jira and Confluence.", kind: "primary", enabled: true }];
+    case "revise":
+      return [{ id: "apply_review", label: "Apply review", helper: "Use the review feedback and prepare one more pass.", kind: "primary", enabled: true }];
+    case "shared":
+      return [{ id: "confirm_share", label: "Check share status", helper: "Review the final shared state.", kind: "primary", enabled: true }];
+    default:
+      return [];
+  }
+}
+
+function shareStatusesForState(scenario: TaskScenario, state: TaskDisplayState): ShareStatus[] {
+  if (state === "shared") {
+    return scenario.shareStates.shared;
+  }
+
+  if (state === "ready_for_decision" || state === "revise") {
+    return scenario.shareStates.ready;
+  }
+
+  return scenario.shareStates.working;
+}
+
+function resultsForState(scenario: TaskScenario, runtime: TaskRuntime): ResultItem[] {
+  const results: ResultItem[] = [];
+  const hasPmResult =
+    runtime.displayState === "response_received" ||
+    runtime.displayState === "review_requested" ||
+    runtime.displayState === "ready_for_decision" ||
+    runtime.displayState === "revise" ||
+    runtime.displayState === "shared" ||
+    (runtime.displayState === "waiting_for_agent" && runtime.activeRole === "critic");
+
+  const hasCriticResult =
+    runtime.displayState === "ready_for_decision" || runtime.displayState === "revise" || runtime.displayState === "shared";
+
+  if (hasPmResult) {
+    results.push(scenario.pmResult);
+  }
+
+  if (hasCriticResult && scenario.criticResult) {
+    results.push(scenario.criticResult);
+  }
+
+  return results;
+}
+
+function reviewCopyForState(scenario: TaskScenario, state: TaskDisplayState) {
+  if (state === "revise") {
+    return {
+      headline: scenario.reviewCopy.reviseHeadline,
+      summary: scenario.reviewCopy.reviseSummary,
+      outcomeState: "revise" as const,
+      operatorDecisionLabel: "Revise before team share",
+      operatorDecisionDetail: "Use the review feedback to tighten the draft before publishing anything to the team.",
+      reviewChecklist: ["Clarify the missing owner.", "Close the schedule dependency.", "Run one more review pass before share."],
+    };
+  }
+
+  if (state === "shared") {
+    return {
+      headline: scenario.reviewCopy.sharedHeadline,
+      summary: scenario.reviewCopy.sharedSummary,
+      outcomeState: "ready_for_decision" as const,
+      operatorDecisionLabel: "Shared state confirmed",
+      operatorDecisionDetail: "The operator has already confirmed the final share state and the team can now read the result in Jira and Confluence.",
+      reviewChecklist: ["Confirm the summary matches across systems.", "Check that the next action is visible.", "Share timing has already been confirmed."],
+    };
+  }
+
+  return {
+    headline: scenario.reviewCopy.readyHeadline,
+    summary: scenario.reviewCopy.readySummary,
+    outcomeState: "ready_for_decision" as const,
+    operatorDecisionLabel: "Operator decision required",
+    operatorDecisionDetail: "The Critic review is complete, but the operator still decides whether to share now or revise first.",
+    reviewChecklist: ["Check whether the summary is team-ready.", "Confirm Jira and Confluence should show the same message.", "Decide whether to share now or revise once more."],
+  };
+}
+
+function activeBriefForRuntime(scenario: TaskScenario, runtime: TaskRuntime): TaskBriefTemplate {
+  return runtime.activeRole === "critic" ? scenario.criticBrief : scenario.pmBrief;
+}
+
+function connectedAgentsForRuntime(scenario: TaskScenario, runtime: TaskRuntime): ConnectedAgentRecord[] {
+  return scenario.connectedAgentIds
+    .map((id) => agentMap.get(id))
+    .filter((agent): agent is AgentRecord => Boolean(agent))
+    .map((agent) => {
+      const isActive = agent.roleId === runtime.activeRole;
+      const isWaitingStage = runtime.displayState === "waiting_for_agent";
+
+      let status = agent.status;
+      let statusNote = agent.statusNote;
+
+      if (isActive && isWaitingStage && agent.roleId !== "ops") {
+        status = "reviewing";
+        statusNote = "Waiting for the response from this agent.";
+      } else if (isActive && !isWaitingStage && agent.roleId !== "ops") {
+        status = "connected";
+        statusNote = "This is the active role for the current stage.";
+      } else if (agent.roleId === "ops" && (runtime.displayState === "ready_for_decision" || runtime.displayState === "shared")) {
+        status = "connected";
+        statusNote = "Ready to confirm the final team-share state.";
+      }
+
+      return {
+        ...agent,
+        status,
+        statusNote,
+      };
+    });
+}
+
+function createTaskRecord(scenario: TaskScenario, runtime: TaskRuntime): TaskRecord {
+  const action = nextAction(runtime.displayState);
+  const reviewCopy = reviewCopyForState(scenario, runtime.displayState);
+
+  return {
+    id: scenario.id,
+    title: scenario.title,
+    account: scenario.account,
+    summary: scenario.summary,
+    objective: scenario.objective,
+    dueLabel: scenario.dueLabel,
+    updatedAt: runtime.updatedAt,
+    urgency: scenario.urgency,
+    displayState: runtime.displayState,
+    stageLabel: statusLabel(runtime.displayState),
+    activeRole: runtime.activeRole,
+    nextActionLabel: action.label,
+    nextActionDetail: action.detail,
+    actions: actionsForState(runtime.displayState),
+    handoffMode: runtime.handoffMode,
+    handoffModeOptions: HANDOFF_MODES,
+    connectedAgents: connectedAgentsForRuntime(scenario, runtime),
+    activeBrief: activeBriefForRuntime(scenario, runtime),
+    shareStatuses: shareStatusesForState(scenario, runtime.displayState),
+    results: resultsForState(scenario, runtime),
+    contextEntries: scenario.contextEntries,
+    sources: scenario.sources,
+    reviewHeadline: reviewCopy.headline,
+    reviewSummary: reviewCopy.summary,
+    reviewChecklist: reviewCopy.reviewChecklist,
+    operatorDecisionLabel: reviewCopy.operatorDecisionLabel,
+    operatorDecisionDetail: reviewCopy.operatorDecisionDetail,
+    reviewOutcomeState: reviewCopy.outcomeState,
+  };
+}
+
+function rebuildProduct(previous: ProductExperience, runtimeMap: Record<string, TaskRuntime>): ProductExperience {
+  return {
+    ...previous,
+    tasks: SCENARIOS.map((scenario) => createTaskRecord(scenario, runtimeMap[scenario.id])),
+  };
+}
+
+function advanceState(previous: TaskRuntime, actionId: TaskActionId, scenario: TaskScenario): TaskRuntime {
+  switch (actionId) {
+    case "prepare_brief":
+      return {
+        ...previous,
+        displayState: "brief_ready",
+        activeRole: "pm",
+        updatedAt: "Just now",
+      };
+    case "mark_sent":
+      return {
+        ...previous,
+        displayState: "waiting_for_agent",
+        activeRole: previous.displayState === "review_requested" ? "critic" : previous.activeRole,
+        updatedAt: "Just now",
+      };
+    case "receive_result":
+      if (previous.activeRole === "critic") {
+        return {
+          ...previous,
+          displayState: scenario.reviewOutcomeState,
+          activeRole: "ops",
+          updatedAt: "Just now",
+        };
+      }
+
+      return {
+        ...previous,
+        displayState: "response_received",
+        activeRole: "pm",
+        updatedAt: "Just now",
+      };
+    case "request_review":
+      return {
+        ...previous,
+        displayState: "review_requested",
+        activeRole: "critic",
+        updatedAt: "Just now",
+      };
+    case "apply_review":
+      return {
+        ...previous,
+        displayState: "brief_ready",
+        activeRole: "pm",
+        updatedAt: "Just now",
+      };
+    case "confirm_share":
+      return {
+        ...previous,
+        displayState: "shared",
+        activeRole: "ops",
+        updatedAt: "Just now",
+      };
+    default:
+      return previous;
+  }
+}
+
+export function preferredViewForTask(task: TaskRecord): ProductViewId {
+  switch (task.displayState) {
+    case "not_started":
+    case "brief_ready":
+      return "task";
+    case "waiting_for_agent":
+    case "response_received":
+    case "review_requested":
+      return "handoff";
+    case "ready_for_decision":
+    case "revise":
+    case "shared":
+      return "review";
+    default:
+      return "task";
+  }
+}
+
+export function performTaskAction(product: ProductExperience, taskId: string, actionId: TaskActionId) {
+  const scenario = scenarioById(taskId);
+  const runtimeMap: Record<string, TaskRuntime> = Object.fromEntries(
+    product.tasks.map((task) => [
+      task.id,
+      {
+        displayState: task.displayState,
+        activeRole: task.activeRole,
+        handoffMode: task.handoffMode,
+        updatedAt: task.updatedAt,
+      },
+    ]),
+  );
+
+  runtimeMap[taskId] = advanceState(runtimeMap[taskId], actionId, scenario);
+
+  const nextProduct = rebuildProduct(product, runtimeMap);
+  const nextTask = nextProduct.tasks.find((task) => task.id === taskId) ?? nextProduct.tasks[0];
+
+  return {
+    product: nextProduct,
+    nextView: nextTask ? preferredViewForTask(nextTask) : "task",
+  };
+}
+
+export function setTaskHandoffMode(product: ProductExperience, taskId: string, mode: HandoffMode): ProductExperience {
+  const runtimeMap: Record<string, TaskRuntime> = Object.fromEntries(
+    product.tasks.map((task) => [
+      task.id,
+      {
+        displayState: task.displayState,
+        activeRole: task.activeRole,
+        handoffMode: task.handoffMode,
+        updatedAt: task.updatedAt,
+      },
+    ]),
+  );
+
+  runtimeMap[taskId] = {
+    ...runtimeMap[taskId],
+    handoffMode: mode,
+    updatedAt: "Just now",
+  };
+
+  return rebuildProduct(product, runtimeMap);
+}
+
+export const initialProductExperience: ProductExperience = {
+  title: "AI_Japan_project",
+  subtitle: "A connected-agent workspace for continuing project work from shared context.",
+  workspaceLabel: "Connected-agent workspace",
+  workspaceTagline: "Structured context in, role-based work out, team-sharing state at the end.",
+  agents: AGENTS,
+  tasks: SCENARIOS.map((scenario) => createTaskRecord(scenario, INITIAL_RUNTIME[scenario.id])),
 };
-

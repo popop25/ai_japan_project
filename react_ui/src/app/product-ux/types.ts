@@ -1,18 +1,66 @@
-﻿export type ProductViewId = "workboard" | "task" | "handoff" | "review" | "context";
+export type ProductViewId = "task" | "handoff" | "review";
 
+export type AgentRoleId = "pm" | "critic" | "ops";
 export type AgentStatus = "connected" | "waiting" | "reviewing";
 export type ShareStatusTone = "healthy" | "attention" | "pending";
 export type ResultStatusTone = "ready" | "review" | "pending";
+export type HandoffMode = "copy_paste" | "file_handoff";
+export type TaskActionKind = "primary" | "secondary";
+
+export type TaskDisplayState =
+  | "not_started"
+  | "brief_ready"
+  | "waiting_for_agent"
+  | "response_received"
+  | "review_requested"
+  | "ready_for_decision"
+  | "revise"
+  | "shared";
+
+export type TaskActionId =
+  | "prepare_brief"
+  | "mark_sent"
+  | "receive_result"
+  | "request_review"
+  | "apply_review"
+  | "confirm_share";
 
 export interface AgentRecord {
   id: string;
   name: string;
-  role: string;
+  roleId: AgentRoleId;
+  roleLabel: string;
+  responsibility: string;
+  productLabel: string;
   focus: string;
   status: AgentStatus;
-  connectedSince: string;
-  queueDepth: number;
-  latency: string;
+  statusNote: string;
+}
+
+export interface ConnectedAgentRecord {
+  id: string;
+  name: string;
+  roleId: AgentRoleId;
+  roleLabel: string;
+  responsibility: string;
+  productLabel: string;
+  focus: string;
+  status: AgentStatus;
+  statusNote: string;
+}
+
+export interface HandoffModeOption {
+  id: HandoffMode;
+  label: string;
+  helper: string;
+}
+
+export interface TaskAction {
+  id: TaskActionId;
+  label: string;
+  helper: string;
+  kind: TaskActionKind;
+  enabled: boolean;
 }
 
 export interface ShareStatus {
@@ -20,12 +68,13 @@ export interface ShareStatus {
   label: string;
   detail: string;
   tone: ShareStatusTone;
+  updatedAt: string;
 }
 
 export interface ResultItem {
   id: string;
   title: string;
-  fromAgentId: string;
+  fromAgentLabel: string;
   summary: string;
   status: ResultStatusTone;
   updatedAt: string;
@@ -37,13 +86,6 @@ export interface ContextEntry {
   value: string;
 }
 
-export interface DecisionItem {
-  id: string;
-  label: string;
-  rationale: string;
-  state: "locked" | "watching" | "next";
-}
-
 export interface SourceDocument {
   id: string;
   title: string;
@@ -52,37 +94,55 @@ export interface SourceDocument {
   note: string;
 }
 
+export interface TaskBriefTemplate {
+  roleId: AgentRoleId;
+  roleLabel: string;
+  title: string;
+  instruction: string;
+  body: string;
+  checklist: string[];
+  expectedResponse: string;
+  contextIncluded: string[];
+  handoffPath: string;
+  responsePath: string;
+}
+
 export interface TaskRecord {
   id: string;
   title: string;
   account: string;
-  stage: string;
   summary: string;
   objective: string;
-  nextActionLabel: string;
-  nextActionDetail: string;
   dueLabel: string;
   updatedAt: string;
   urgency: string;
-  agentIds: string[];
-  handoffTargetId: string;
-  handoffTitle: string;
-  handoffInstruction: string;
-  reviewHeadline: string;
-  reviewSummary: string;
-  actionLabels: string[];
+  displayState: TaskDisplayState;
+  stageLabel: string;
+  activeRole: AgentRoleId;
+  nextActionLabel: string;
+  nextActionDetail: string;
+  actions: TaskAction[];
+  handoffMode: HandoffMode;
+  handoffModeOptions: HandoffModeOption[];
+  connectedAgents: ConnectedAgentRecord[];
+  activeBrief: TaskBriefTemplate;
   shareStatuses: ShareStatus[];
   results: ResultItem[];
   contextEntries: ContextEntry[];
-  decisions: DecisionItem[];
   sources: SourceDocument[];
+  reviewHeadline: string;
+  reviewSummary: string;
+  reviewChecklist: string[];
+  operatorDecisionLabel: string;
+  operatorDecisionDetail: string;
+  reviewOutcomeState: "ready_for_decision" | "revise";
 }
 
 export interface ProductExperience {
   title: string;
   subtitle: string;
   workspaceLabel: string;
+  workspaceTagline: string;
   agents: AgentRecord[];
   tasks: TaskRecord[];
 }
-

@@ -1,4 +1,4 @@
-﻿import { TaskRecord } from "../types";
+import { TaskRecord } from "../types";
 
 interface WorkboardListProps {
   activeTaskId: string;
@@ -8,36 +8,40 @@ interface WorkboardListProps {
 
 export function WorkboardList({ activeTaskId, onSelectTask, tasks }: WorkboardListProps) {
   return (
-    <section className="agent-panel">
-      <div className="agent-panel__header">
+    <section className="drawer-panel">
+      <div className="section-heading section-heading--row">
         <div>
-          <span className="agent-kicker">Task Inbox / Workboard</span>
-          <h3>지금 이어서 처리할 task</h3>
+          <span className="eyebrow">Task picker</span>
+          <h3>Continue one task at a time</h3>
         </div>
-        <span className="agent-counter">{tasks.length} open tasks</span>
+        <span className="counter">{tasks.length}</span>
       </div>
+
       <div className="workboard-list">
-        {tasks.map((task) => (
-          <button
-            key={task.id}
-            className={task.id === activeTaskId ? "workboard-item is-active" : "workboard-item"}
-            onClick={() => onSelectTask(task.id)}
-            type="button"
-          >
-            <div className="workboard-item__topline">
-              <strong>{task.title}</strong>
-              <span>{task.stage}</span>
-            </div>
-            <p>{task.summary}</p>
-            <div className="workboard-item__meta">
-              <span>{task.nextActionLabel}</span>
-              <span>{task.dueLabel}</span>
-              <span>{task.urgency}</span>
-            </div>
-          </button>
-        ))}
+        {tasks.map((task) => {
+          const shareSnapshot = task.shareStatuses[0];
+
+          return (
+            <button
+              key={task.id}
+              className={task.id === activeTaskId ? "workboard-item is-active" : "workboard-item"}
+              onClick={() => onSelectTask(task.id)}
+              type="button"
+            >
+              <div className="workboard-item__topline">
+                <strong>{task.title}</strong>
+                <span className="state-chip state-chip--neutral">{task.stageLabel}</span>
+              </div>
+              <p>{task.summary}</p>
+              <div className="workboard-item__meta">
+                <span>Next / {task.nextActionLabel}</span>
+                <span>Due / {task.dueLabel}</span>
+              </div>
+              <small>{shareSnapshot?.label ?? "Share state not staged yet"}</small>
+            </button>
+          );
+        })}
       </div>
     </section>
   );
 }
-

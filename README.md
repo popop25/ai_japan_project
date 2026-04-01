@@ -1,148 +1,127 @@
 # AI_Japan_project
 
-`AI_Japan_project` is a Streamlit-based AI work harness for business-facing workflows.
+`AI_Japan_project` is a connected-agent workflow platform.
 
-It is designed for a setup where the workflow platform and the reasoning agent are separate:
+If project context is structured once, role-based AI agents can read it, continue the work, and hand the result back to the team through shared systems.
 
-- the harness owns context, task state, packets, artifacts, and system-of-record sync
-- the external agent owns the actual PM draft or Critic review generation
+## Product Goal
 
-Today the project supports both a local demo mode and a live Atlassian-backed mode.
+The product we are trying to demonstrate is:
 
-## What the Harness Owns
+1. Confluence stores project context, decisions, and role instructions.
+2. Jira stores the task lifecycle.
+3. A user connects their own agent for PM and Critic work.
+4. The workspace prepares the next handoff, receives the result, and keeps the flow moving.
+5. The outcome is prepared for team sharing in Jira and Confluence.
 
-The project is organized around six responsibilities:
+This is not a built-in chatbot. It is workflow infrastructure for role-based agents.
 
-1. Context management
-2. Task state management
-3. PM / Critic packet generation
-4. Artifact persistence
-5. Jira / Confluence synchronization
-6. External agent handoff orchestration
+## Current Demo Surface
 
-This is why the project should be thought of as a harness or control plane, not as a single embedded chatbot.
+The current cycle is React-first and reference-driven.
 
-## Runtime Modes
+- `react_ui/`
+  - current demo surface
+  - fixture-based connected-agent workspace
+  - 3-step happy path: `Task -> Agent Handoff -> Review & Share`
+  - explicit manual handoff with `copy_paste` and `file_handoff`
+  - visual direction: Obsidian-led document surface, ArgoCD-style state clarity, Atlassian-style team-sharing cues
+- `app_ui/`
+  - frozen internal fallback
+  - not the active product direction for this cycle
+- `src/ai_japan_project/`
+  - Python harness and service layer
+  - still owns orchestration, storage, and future live integration boundaries
 
-### `AJP_MODE=local`
+## What The React Demo Proves
 
-- Canonical context lives in `project/context.yaml` and `project/03_context.md`
-- Tasks live in `project/tasks/*.yaml`
-- Artifacts live in `project/artifacts/*.md`
-- Prompt packets and run history live in `project/runs/*`
-- No Atlassian credentials are required
+The React demo is intentionally honest about the current scope.
 
-### `AJP_MODE=atlassian`
+It proves:
 
-- Jira is the canonical task store
-- Confluence is the canonical context and artifact store
-- Prompt packets and run history still remain local under `project/runs/*`
-- The same Streamlit UI and `ProjectService` flow are reused
+- a user can understand the product within one happy path
+- the workflow is centered on `task -> handoff -> review/share`
+- PM and Critic are role-based agents, not hard-coded products
+- Jira and Confluence are shown as shared-with-team surfaces
 
-## Current Status
+It does **not** yet prove:
 
-This repository is no longer just a local mockup.
+- live API integration
+- real-time agent connection
+- automatic Jira / Confluence write-back from the React UI
 
-The current codebase already includes:
+Those are next-stage integration tasks after the demo UX baseline is fixed.
 
-- local / Atlassian mode switching
-- Jira task synchronization with fail-closed issue existence checks
-- Confluence context and artifact synchronization
-- `.env` auto-loading with OS env precedence
-- readiness / preflight tooling
-- repeatable live smoke tooling
-- smoke cleanup tooling
-- live tenant hardening for localized Jira workflows and Confluence metadata fallback
+## Agent Model
 
-A live end-to-end smoke run has already succeeded against a real Jira + Confluence tenant.
+The first supported connection model is `personal_agent`.
+
+That means the user brings their own agent product such as Codex or Claude and uses it in role mode:
+
+- `PM Agent`
+- `Critic Agent`
+
+The current demo supports these handoff patterns conceptually:
+
+- `copy_paste`
+- `file_handoff`
+
+The app prepares the brief and the user performs the actual handoff manually.
 
 ## Repository Map
 
-- `app_ui/`
-  - Streamlit UI shell and workflow screens
+- `react_ui/`
+  - React demo application
 - `src/ai_japan_project/`
-  - service layer, local stores, Atlassian adapters, operational tooling
+  - Python service layer, local stores, Atlassian adapters, operational tooling
 - `project/`
   - seed context, skills, and local runtime data
 - `scripts/`
   - readiness, smoke, and cleanup entry points
 - `docs/`
-  - architecture, operations, and external agent integration notes
+  - architecture and product-direction notes
 
-## Run the App
+## Run The React Demo
 
 ```powershell
-python -m streamlit run app_ui/streamlit_app.py
+cd react_ui
+cmd /c npm install
+cmd /c npm run dev -- --host 127.0.0.1 --port 4173 --strictPort
 ```
 
-If you want to force Atlassian mode for the current shell:
+Build check:
 
 ```powershell
-$env:AJP_MODE="atlassian"
+cd react_ui
+cmd /c npm run build
+```
+
+## Internal Fallback
+
+The Streamlit app still exists for internal fallback and harness validation, but it is frozen for product UI work in this cycle.
+
+```powershell
 python -m streamlit run app_ui/streamlit_app.py
 ```
 
 ## Operational Commands
 
-### Readiness / preflight
+These still belong to the Python harness and remain useful for future live integration work:
 
 ```powershell
 python scripts/ajp_readiness.py
 python scripts/ajp_readiness.py --mode atlassian
-```
-
-### Live smoke run
-
-```powershell
 python scripts/ajp_smoke.py
-```
-
-### Smoke cleanup
-
-```powershell
 python scripts/ajp_cleanup.py
-python scripts/ajp_cleanup.py --apply
-```
-
-### Tests
-
-```powershell
 pytest tests -q --basetemp=.tmp_test_runs\pytest
 ```
-
-## Configuration
-
-Keep your live Atlassian credentials in local environment variables or in a local `.env` file.
-
-Settings are resolved in this order:
-
-1. OS environment variables
-2. repository `.env`
-
-`.env` is ignored by Git. `.env.example` remains the checked-in template.
-
-## External Agent Model
-
-The project is intentionally agent-neutral.
-
-The expected workflow is:
-
-1. generate a PM or Critic packet in the app
-2. send that packet to your own Codex, Claude, or equivalent agent
-3. receive a Markdown result
-4. paste the result back into the app
-5. let the harness update local state plus Jira / Confluence as needed
-
-Supported patterns include:
-
-- chat handoff
-- file handoff
-- PM / Critic parallel handoff
-
-See [agent integration](docs/agent-integration.md) for the practical patterns.
 
 ## Docs
 
 - [Architecture](docs/architecture.md)
 - [Operations](docs/operations.md)
 - [External agent integration](docs/agent-integration.md)
+- [React demo design brief](docs/react-demo-design-brief.md)
+- [React demo reference board](docs/react-demo-reference-board.md)
+- [Personal agent bridge spec](docs/personal-agent-bridge-spec.md)
+- [Main control notes](docs/main-control.md)

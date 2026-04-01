@@ -1,31 +1,35 @@
-﻿import { ResultInbox } from "../components/ResultInbox";
+import { ResultInbox } from "../components/ResultInbox";
 import { ReviewSummary } from "../components/ReviewSummary";
 import { SourceOfTruthPanel } from "../components/SourceOfTruthPanel";
-import { ProductExperience, TaskRecord } from "../types";
+import { TaskActionId, TaskRecord } from "../types";
 
 interface ReviewResultScreenProps {
-  onOpenTask: () => void;
-  product: ProductExperience;
+  onOpenContext: () => void;
+  onTriggerAction: (actionId: TaskActionId) => void;
   task: TaskRecord;
 }
 
-export function ReviewResultScreen({ onOpenTask, product, task }: ReviewResultScreenProps) {
+export function ReviewResultScreen({ onOpenContext, onTriggerAction, task }: ReviewResultScreenProps) {
+  const primaryAction = task.actions.find((action) => action.kind === "primary");
+
   return (
-    <div className="screen-stack">
-      <ReviewSummary task={task} />
-      <div className="inline-action-row">
-        <button className="agent-button is-primary" onClick={onOpenTask} type="button">
-          검토 결과 반영
-        </button>
-        <button className="agent-button" type="button">
-          팀 공유 상태 확인
-        </button>
+    <div className="review-layout">
+      <div className="screen-stack">
+        <ReviewSummary task={task} />
+        <div className="action-row">
+          {primaryAction ? (
+            <button className="button button--primary button--wide" onClick={() => onTriggerAction(primaryAction.id)} type="button">
+              {primaryAction.label}
+            </button>
+          ) : null}
+          <button className="button button--secondary" onClick={onOpenContext} type="button">
+            Open context
+          </button>
+        </div>
+        <ResultInbox task={task} />
       </div>
-      <div className="screen-grid">
-        <ResultInbox agents={product.agents} task={task} />
-        <SourceOfTruthPanel task={task} />
-      </div>
+
+      <SourceOfTruthPanel task={task} />
     </div>
   );
 }
-
