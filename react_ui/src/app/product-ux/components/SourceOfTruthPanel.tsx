@@ -11,7 +11,7 @@ export function SourceOfTruthPanel({ task }: SourceOfTruthPanelProps) {
   return (
     <div className="aside-stack">
       <section className="aside-section">
-        <div className="aside-label">Shared with team</div>
+        <div className="aside-label">팀 공유 상태</div>
         <div className="share-rail">
           {task.shareStatuses.map((status) => (
             <article key={status.system} className={`share-rail-card share-rail-card--${status.tone}`}>
@@ -27,7 +27,7 @@ export function SourceOfTruthPanel({ task }: SourceOfTruthPanelProps) {
       </section>
 
       <section className="aside-section">
-        <div className="aside-label">Share destinations</div>
+        <div className="aside-label">공유 대상</div>
         <div className="destination-list">
           {(teamDestinations.length > 0 ? teamDestinations : task.sources).map((source) => (
             <article key={source.id} className="destination-card">
@@ -43,22 +43,22 @@ export function SourceOfTruthPanel({ task }: SourceOfTruthPanelProps) {
       </section>
 
       <section className="aside-section">
-        <div className="aside-label">Workflow</div>
+        <div className="aside-label">워크플로우</div>
         <div className="wf-list">
           <div className="wf-row">
             <span className="wf-num">01</span>
-            <span className="wf-name">Task</span>
-            <span className="wf-marker">Done</span>
+            <span className="wf-name">작업</span>
+            <span className="wf-marker">완료</span>
           </div>
           <div className="wf-row">
             <span className="wf-num">02</span>
-            <span className="wf-name">Agent Handoff</span>
-            <span className="wf-marker">Done</span>
+            <span className="wf-name">에이전트 전달</span>
+            <span className="wf-marker">완료</span>
           </div>
           <div className={isShared ? "wf-row complete" : "wf-row current"}>
             <span className="wf-num">03</span>
-            <span className="wf-name">Review &amp; Share</span>
-            <span className="wf-marker">{isShared ? "Done" : "Now"}</span>
+            <span className="wf-name">검토 및 공유</span>
+            <span className="wf-marker">{isShared ? "완료" : "현재"}</span>
           </div>
         </div>
       </section>

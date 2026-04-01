@@ -7,11 +7,11 @@ interface ResultInboxProps {
 function resultStatusLabel(status: TaskRecord["results"][number]["status"]) {
   switch (status) {
     case "ready":
-      return "Draft received";
+      return "초안 수신";
     case "review":
-      return "Review received";
+      return "검토 수신";
     case "pending":
-      return "Waiting";
+      return "대기 중";
     default:
       return status;
   }
@@ -20,7 +20,7 @@ function resultStatusLabel(status: TaskRecord["results"][number]["status"]) {
 export function ResultInbox({ task }: ResultInboxProps) {
   return (
     <section className="review-results">
-      <div className="section-header">Returned items</div>
+      <div className="section-header">돌아온 결과</div>
 
       <div className="result-document-list">
         {task.results.length > 0 ? (
@@ -28,7 +28,7 @@ export function ResultInbox({ task }: ResultInboxProps) {
             <article key={result.id} className="result-document-item">
               <div className="result-document-item__topline">
                 <div>
-                  <span className="prop-label">Returned by</span>
+                  <span className="prop-label">응답 주체</span>
                   <div className="result-document-item__title">{result.title}</div>
                 </div>
                 <span className={`state-chip state-chip--${result.status}`}>{resultStatusLabel(result.status)}</span>
@@ -42,8 +42,8 @@ export function ResultInbox({ task }: ResultInboxProps) {
           ))
         ) : (
           <article className="result-document-item result-document-item--empty">
-            <strong>No response has been received yet.</strong>
-            <p>The workspace is still waiting for the next result to come back from your agent.</p>
+            <strong>아직 돌아온 응답이 없습니다.</strong>
+            <p>이 작업 공간은 다음 결과가 사용자의 에이전트에서 돌아오기를 기다리고 있습니다.</p>
           </article>
         )}
       </div>

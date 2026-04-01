@@ -60,13 +60,13 @@ interface TaskRuntime {
 const HANDOFF_MODES: HandoffModeOption[] = [
   {
     id: "copy_paste",
-    label: "Copy and paste",
-    helper: "Copy the brief into your agent chat and paste the response back here.",
+    label: "복사 후 붙여넣기",
+    helper: "브리프를 에이전트 채팅에 붙여넣고, 돌아온 응답을 다시 이 작업 공간에 가져옵니다.",
   },
   {
     id: "file_handoff",
-    label: "File handoff",
-    helper: "Send the brief as a file path and bring the response back as a file or paste-back.",
+    label: "파일 handoff",
+    helper: "브리프 파일 경로를 전달하고, 응답을 파일이나 붙여넣기 형태로 다시 가져옵니다.",
   },
 ];
 
@@ -80,7 +80,7 @@ const AGENTS: AgentRecord[] = [
     productLabel: "Codex",
     focus: "brief drafting",
     status: "connected",
-    statusNote: "Connected and ready for the next PM handoff.",
+    statusNote: "다음 PM handoff를 바로 이어갈 수 있는 상태입니다.",
   },
   {
     id: "critic-agent",
@@ -91,7 +91,7 @@ const AGENTS: AgentRecord[] = [
     productLabel: "Claude",
     focus: "quality review",
     status: "connected",
-    statusNote: "Connected for review once the PM draft is back.",
+    statusNote: "PM 초안이 돌아오면 바로 검토를 시작할 수 있습니다.",
   },
   {
     id: "ops-agent",
@@ -102,7 +102,7 @@ const AGENTS: AgentRecord[] = [
     productLabel: "Workspace",
     focus: "team share",
     status: "waiting",
-    statusNote: "Waiting for the operator to confirm the share step.",
+    statusNote: "운영자가 마지막 공유 단계를 확인하기를 기다리고 있습니다.",
   },
 ];
 
@@ -112,12 +112,12 @@ const SCENARIOS: TaskScenario[] = [
   {
     id: "task-japan-launch",
     isPrimaryDemo: true,
-    title: "Japan launch brief",
+    title: "일본 런치 브리프",
     account: "AI Japan launch",
-    summary: "Prepare one short launch brief the retail team can review before tomorrow's planning check-in.",
-    objective: "Confirm the scope, missing owners, and the next decision before we send a first draft to the team.",
-    dueLabel: "Today, 18:00 KST",
-    urgency: "Needs a draft before today's review",
+    summary: "내일 런치 점검 전에 팀이 빠르게 읽고 맞출 수 있는 짧은 브리프를 준비합니다.",
+    objective: "첫 초안을 팀에 공유하기 전에 범위, 빠진 담당자, 마지막 결정 포인트를 확인합니다.",
+    dueLabel: "오늘 18:00 KST",
+    urgency: "오늘 검토 전에 초안이 필요합니다",
     initialState: "brief_ready",
     initialRole: "pm",
     initialHandoffMode: "copy_paste",
@@ -126,112 +126,112 @@ const SCENARIOS: TaskScenario[] = [
     pmBrief: {
       roleId: "pm",
       roleLabel: "PM Agent",
-      title: "Japan launch PM brief",
-      instruction: "Prepare a concise launch brief the team can react to in one read.",
-      body: `# Japan launch PM brief
+      title: "일본 런치 PM 브리프",
+      instruction: "팀이 한 번에 읽고 반응할 수 있는 짧은 런치 브리프를 준비합니다.",
+      body: `# 일본 런치 PM 브리프
 
-Goal
-- Summarize the launch scope in one paragraph.
-- Call out missing owners or blockers.
-- End with the one decision we still need before team share.
+목표
+- 런치 범위를 한 문단으로 정리합니다.
+- 빠진 담당자나 막힌 요소를 분리해서 적습니다.
+- 팀 공유 전에 남은 마지막 결정 포인트를 끝에 정리합니다.
 
-Output
-- One draft brief
-- One short list of open questions`,
+출력
+- 브리프 초안 1개
+- 열린 질문 목록 1개`,
       checklist: [
-        "State the launch goal and scope clearly.",
-        "Separate missing owners from open blockers.",
-        "End with the single next decision the team needs.",
+        "런치 목표와 범위를 분명하게 적습니다.",
+        "빠진 담당자와 블로커를 구분합니다.",
+        "팀이 바로 판단해야 할 다음 결정을 끝에 남깁니다.",
       ],
-      expectedResponse: "One brief draft and one list of open questions",
-      contextIncluded: ["03_Context summary", "launch decision note", "current Jira task state"],
+      expectedResponse: "브리프 초안 1개와 열린 질문 목록 1개",
+      contextIncluded: ["03_Context 요약", "런치 의사결정 메모", "현재 Jira 작업 상태"],
       handoffPath: "project/runs/japan-launch-brief.md",
       responsePath: "launch-brief-response.md",
     },
     criticBrief: {
       roleId: "critic",
       roleLabel: "Critic Agent",
-      title: "Japan launch review brief",
-      instruction: "Review the PM draft for missing owners, blockers, and whether it is ready for team share.",
-      body: `# Japan launch Critic brief
+      title: "일본 런치 Critic 브리프",
+      instruction: "PM 초안에서 빠진 담당자, 블로커, 팀 공유 준비 상태를 검토합니다.",
+      body: `# 일본 런치 Critic 브리프
 
-Review the PM draft and answer:
-- What is still missing before we share this with the team?
-- Is the summary clear enough for operators and PMs?
-- Should we share now, or revise once more?
+PM 초안을 읽고 아래를 확인합니다.
+- 팀과 공유하기 전에 아직 빠진 내용이 있는가?
+- 운영자와 PM이 이해하기에 충분히 명확한가?
+- 지금 공유해도 되는가, 아니면 한 번 더 수정해야 하는가?
 
-Output
-- Verdict: ready_for_decision or revise
-- Summary
-- Recommended changes`,
+출력
+- verdict: ready_for_decision 또는 revise
+- 요약
+- 권장 수정 사항`,
       checklist: [
-        "Call out missing owners or blocked decisions.",
-        "Check whether the brief can be shared now.",
-        "Recommend the operator's next move.",
+        "빠진 담당자나 막힌 결정을 짚어줍니다.",
+        "지금 팀 공유가 가능한지 판단합니다.",
+        "운영자의 다음 행동을 추천합니다.",
       ],
-      expectedResponse: "A short review verdict and recommended changes",
-      contextIncluded: ["PM draft", "launch goal", "team share expectation"],
+      expectedResponse: "짧은 검토 verdict와 권장 수정 사항",
+      contextIncluded: ["PM 초안", "런치 목표", "팀 공유 기준"],
       handoffPath: "project/runs/japan-launch-review.md",
       responsePath: "launch-review-response.md",
     },
     pmResult: {
       id: "result-japan-launch-draft",
-      title: "Launch brief draft v1",
+      title: "런치 브리프 초안 v1",
       fromAgentLabel: "My Codex",
-      summary: "Drafted a one-page brief with launch scope, open owner gaps, and one final share decision.",
+      summary: "런치 범위, 빠진 담당자, 마지막 공유 판단을 담은 1페이지 초안을 작성했습니다.",
       status: "ready",
-      updatedAt: "Just now",
+      updatedAt: "방금 전",
     },
     criticResult: {
       id: "result-japan-launch-review",
-      title: "Launch brief review",
+      title: "런치 브리프 검토",
       fromAgentLabel: "My Claude",
-      summary: "One owner gap and one schedule dependency still need to be clarified before team share.",
+      summary: "팀 공유 전에 담당자 공백 1건과 일정 의존성 1건을 더 확인해야 합니다.",
       status: "review",
-      updatedAt: "Just now",
+      updatedAt: "방금 전",
     },
     contextEntries: [
-      { id: "japan-goal", label: "Goal", value: "Share one clear brief the launch squad can align on before tomorrow's planning review." },
-      { id: "japan-gap", label: "Open gap", value: "Legal owner and store rollout dependency are still not fully confirmed." },
-      { id: "japan-share", label: "Share expectation", value: "Jira and Confluence should show the same next action for the launch team." },
+      { id: "japan-goal", label: "목표", value: "내일 플래닝 리뷰 전에 런치 팀이 바로 맞출 수 있는 브리프 1개를 만든다." },
+      { id: "japan-gap", label: "열린 이슈", value: "법무 담당자와 매장 롤아웃 의존성이 아직 완전히 확정되지 않았다." },
+      { id: "japan-share", label: "공유 기준", value: "Jira와 Confluence에 같은 다음 행동이 보이도록 정리한다." },
     ],
     sources: [
-      { id: "japan-source-context", title: "03_Context", type: "Confluence", freshness: "Updated today", note: "Launch constraints and scope guardrails" },
-      { id: "japan-source-task", title: "KAN-9", type: "Jira", freshness: "Updated 12 min ago", note: "Current task owner and due date" },
-      { id: "japan-source-note", title: "Launch operator notes", type: "Workspace note", freshness: "Revised this morning", note: "Missing owner and team-share criteria" },
+      { id: "japan-source-context", title: "03_Context", type: "Confluence", freshness: "오늘 업데이트", note: "런치 제약 사항과 범위 기준" },
+      { id: "japan-source-task", title: "KAN-9", type: "Jira", freshness: "12분 전 업데이트", note: "현재 작업 담당자와 마감 일정" },
+      { id: "japan-source-note", title: "런치 운영 메모", type: "Workspace note", freshness: "오늘 오전 수정", note: "빠진 담당자와 팀 공유 기준" },
     ],
     shareStates: {
       working: [
-        { system: "Jira", label: "Share note is still being prepared", detail: "The task is active, but the team-facing update has not been posted yet.", tone: "healthy", updatedAt: "2 min ago" },
-        { system: "Confluence", label: "Draft not shared yet", detail: "The share page is still waiting for a reviewed draft.", tone: "pending", updatedAt: "Not posted yet" },
+        { system: "Jira", label: "팀 공유용 정리 중", detail: "작업은 진행 중이지만 팀이 볼 최종 요약은 아직 게시되지 않았습니다.", tone: "healthy", updatedAt: "2분 전" },
+        { system: "Confluence", label: "초안 공유 전", detail: "검토된 초안이 올라오기 전이라 공유 페이지가 아직 대기 중입니다.", tone: "pending", updatedAt: "아직 게시 전" },
       ],
       ready: [
-        { system: "Jira", label: "Ready for team-share confirmation", detail: "The latest draft and review are connected to the task and ready for operator confirmation.", tone: "healthy", updatedAt: "Just now" },
-        { system: "Confluence", label: "Share page waiting for decision", detail: "The page is prepared, but the operator still needs to decide whether to share or revise.", tone: "attention", updatedAt: "Decision pending" },
+        { system: "Jira", label: "팀 공유 확인 대기", detail: "최신 초안과 검토 결과가 작업에 연결되어 있고 운영자 확인만 남았습니다.", tone: "healthy", updatedAt: "방금 전" },
+        { system: "Confluence", label: "공유 여부 판단 대기", detail: "페이지는 준비되었지만 운영자가 공유 여부를 아직 결정하지 않았습니다.", tone: "attention", updatedAt: "판단 대기" },
       ],
       shared: [
-        { system: "Jira", label: "Shared with the team", detail: "The latest summary and next action are visible from the task.", tone: "healthy", updatedAt: "Just now" },
-        { system: "Confluence", label: "Shared with the team", detail: "The brief is now published for the launch squad to read in one place.", tone: "healthy", updatedAt: "Just now" },
+        { system: "Jira", label: "팀과 공유됨", detail: "최신 요약과 다음 행동이 Jira 작업에서 바로 보입니다.", tone: "healthy", updatedAt: "방금 전" },
+        { system: "Confluence", label: "팀과 공유됨", detail: "런치 팀이 한곳에서 읽을 수 있도록 브리프가 게시되었습니다.", tone: "healthy", updatedAt: "방금 전" },
       ],
     },
     reviewCopy: {
-      reviseHeadline: "One more revision pass is still needed.",
-      reviseSummary: "The review found one missing owner and one schedule dependency, so we should tighten the draft before team share.",
-      readyHeadline: "The final team-share decision is ready.",
-      readySummary: "The review is complete and only the operator's share decision is left.",
-      sharedHeadline: "The latest version is already shared.",
-      sharedSummary: "Jira and Confluence now show the same summary and the same next action.",
+      reviseHeadline: "한 번 더 수정이 필요합니다.",
+      reviseSummary: "검토 결과 빠진 담당자와 일정 의존성이 남아 있어 팀 공유 전에 초안을 한 번 더 다듬어야 합니다.",
+      readyHeadline: "최종 팀 공유 판단만 남았습니다.",
+      readySummary: "검토는 끝났고, 이제 운영자가 마지막 공유 여부를 확인하면 됩니다.",
+      sharedHeadline: "최신 버전이 이미 공유되었습니다.",
+      sharedSummary: "Jira와 Confluence에 같은 요약과 같은 다음 행동이 반영되어 있습니다.",
     },
   },
   {
     id: "task-pricing-impact",
     isPrimaryDemo: false,
-    title: "Pricing change note",
+    title: "가격 변경 요약",
     account: "Billing update",
-    summary: "The PM brief has already been sent. We are waiting for the response before we ask for review.",
-    objective: "Use one short note to explain how the pricing change affects FAQ wording and customer-facing copy.",
-    dueLabel: "Tomorrow, 11:00 JST",
-    urgency: "Support copy needs a same-day update",
+    summary: "PM 브리프는 이미 전달되었고, 검토 요청 전에 응답을 기다리는 상태입니다.",
+    objective: "가격 변경이 FAQ 문구와 고객 안내 문안에 어떤 영향을 주는지 짧은 노트로 정리합니다.",
+    dueLabel: "내일 11:00 JST",
+    urgency: "지원 문구를 당일 안에 정리해야 합니다",
     initialState: "waiting_for_agent",
     initialRole: "pm",
     initialHandoffMode: "file_handoff",
@@ -311,36 +311,36 @@ Review the impact note and answer:
     ],
     shareStates: {
       working: [
-        { system: "Jira", label: "Waiting for the agent response", detail: "The brief is out. Jira will be updated once the response comes back.", tone: "pending", updatedAt: "16 min ago" },
-        { system: "Confluence", label: "No team page yet", detail: "A share page has not been prepared because the note is still in progress.", tone: "pending", updatedAt: "Not posted yet" },
+        { system: "Jira", label: "에이전트 응답 대기", detail: "브리프는 이미 전달되었습니다. 응답이 돌아오면 Jira가 함께 갱신됩니다.", tone: "pending", updatedAt: "16분 전" },
+        { system: "Confluence", label: "팀 공유 페이지 없음", detail: "아직 진행 중인 작업이라 공유 페이지가 준비되지 않았습니다.", tone: "pending", updatedAt: "아직 게시 전" },
       ],
       ready: [
-        { system: "Jira", label: "Ready for share decision", detail: "The impact note and review are attached to the task context for the operator to confirm.", tone: "healthy", updatedAt: "3 min ago" },
-        { system: "Confluence", label: "Draft share page is staged", detail: "The note can be published as soon as the operator confirms the share step.", tone: "attention", updatedAt: "Decision pending" },
+        { system: "Jira", label: "공유 판단 준비 완료", detail: "영향 요약과 검토 결과가 작업 맥락에 연결되어 운영자 확인만 남았습니다.", tone: "healthy", updatedAt: "3분 전" },
+        { system: "Confluence", label: "공유 페이지 준비 완료", detail: "운영자가 공유 단계를 확인하면 바로 게시할 수 있습니다.", tone: "attention", updatedAt: "판단 대기" },
       ],
       shared: [
-        { system: "Jira", label: "Shared with the team", detail: "The task now shows the final impact summary and the next action.", tone: "healthy", updatedAt: "Just now" },
-        { system: "Confluence", label: "Shared with the team", detail: "The support-facing note is published in the shared workspace.", tone: "healthy", updatedAt: "Just now" },
+        { system: "Jira", label: "팀과 공유됨", detail: "최종 영향 요약과 다음 행동이 작업에 반영되어 있습니다.", tone: "healthy", updatedAt: "방금 전" },
+        { system: "Confluence", label: "팀과 공유됨", detail: "지원팀이 읽을 수 있도록 공유 작업 공간에 게시되었습니다.", tone: "healthy", updatedAt: "방금 전" },
       ],
     },
     reviewCopy: {
-      reviseHeadline: "The draft still needs one more pass.",
-      reviseSummary: "The review found a wording or owner gap that makes team share too early.",
-      readyHeadline: "This note is ready for the final share decision.",
-      readySummary: "The review is complete and the remaining work is operator confirmation.",
-      sharedHeadline: "The note has already been shared.",
-      sharedSummary: "The latest pricing update is visible in both Jira and Confluence.",
+      reviseHeadline: "초안에 한 번 더 수정이 필요합니다.",
+      reviseSummary: "검토 결과 문구나 담당자 공백이 남아 있어 지금 공유하기에는 이릅니다.",
+      readyHeadline: "최종 공유 판단만 남았습니다.",
+      readySummary: "검토는 끝났고, 이제 운영자 확인만 남았습니다.",
+      sharedHeadline: "이 요약은 이미 공유되었습니다.",
+      sharedSummary: "최신 가격 변경 요약이 Jira와 Confluence에 반영되어 있습니다.",
     },
   },
   {
     id: "task-retro-share",
     isPrimaryDemo: false,
-    title: "Store ops retro share",
+    title: "점포 운영 회고 공유",
     account: "Post-launch ops",
-    summary: "The review is done. This task is now about the operator's final share decision and the team-facing summary.",
-    objective: "Share the retro summary in a form the launch squad can act on immediately next week.",
-    dueLabel: "Friday, 17:00 KST",
-    urgency: "Needs to go out this week",
+    summary: "검토는 끝났고, 이제 운영자가 최종 공유 여부와 팀 공지 문구를 결정하는 단계입니다.",
+    objective: "다음 주 바로 행동으로 이어질 수 있는 회고 요약을 팀과 공유합니다.",
+    dueLabel: "금요일 17:00 KST",
+    urgency: "이번 주 안에 공유가 필요합니다",
     initialState: "ready_for_decision",
     initialRole: "ops",
     initialHandoffMode: "copy_paste",
@@ -416,25 +416,25 @@ Review the retro summary and answer:
     ],
     shareStates: {
       working: [
-        { system: "Jira", label: "Reference links only", detail: "The follow-up tickets are linked, but the summary has not been shared yet.", tone: "pending", updatedAt: "Reference only" },
-        { system: "Confluence", label: "Draft page only", detail: "The retro page exists, but it is still a draft.", tone: "attention", updatedAt: "Draft only" },
+        { system: "Jira", label: "참고 링크만 연결됨", detail: "후속 작업 티켓은 연결되어 있지만 요약은 아직 공유되지 않았습니다.", tone: "pending", updatedAt: "참고용" },
+        { system: "Confluence", label: "초안 페이지만 존재", detail: "회고 페이지는 만들어졌지만 아직 초안 상태입니다.", tone: "attention", updatedAt: "초안 상태" },
       ],
       ready: [
-        { system: "Jira", label: "Ready for team share", detail: "The follow-up task list and the retro summary are ready to be shown together.", tone: "healthy", updatedAt: "5 min ago" },
-        { system: "Confluence", label: "Waiting for final confirmation", detail: "The retro page is ready to publish as soon as the operator confirms the share step.", tone: "attention", updatedAt: "Decision pending" },
+        { system: "Jira", label: "팀 공유 준비 완료", detail: "후속 작업 목록과 회고 요약을 함께 보여줄 준비가 되었습니다.", tone: "healthy", updatedAt: "5분 전" },
+        { system: "Confluence", label: "최종 확인 대기", detail: "운영자가 공유 단계를 확인하면 회고 페이지를 바로 게시할 수 있습니다.", tone: "attention", updatedAt: "판단 대기" },
       ],
       shared: [
-        { system: "Jira", label: "Shared with the team", detail: "The retro summary now points the squad to the same next action in Jira.", tone: "healthy", updatedAt: "Just now" },
-        { system: "Confluence", label: "Shared with the team", detail: "The published retro note is now available to the full launch squad.", tone: "healthy", updatedAt: "Just now" },
+        { system: "Jira", label: "팀과 공유됨", detail: "회고 요약이 Jira에서 같은 다음 행동을 가리키고 있습니다.", tone: "healthy", updatedAt: "방금 전" },
+        { system: "Confluence", label: "팀과 공유됨", detail: "게시된 회고 노트를 런치 팀 전체가 볼 수 있습니다.", tone: "healthy", updatedAt: "방금 전" },
       ],
     },
     reviewCopy: {
-      reviseHeadline: "This still needs one final revision.",
-      reviseSummary: "One wording issue is still large enough that we should revise before team share.",
-      readyHeadline: "The final share decision is ready.",
-      readySummary: "The review is complete. The only remaining step is the operator's share decision.",
-      sharedHeadline: "The summary is already shared.",
-      sharedSummary: "Jira and Confluence now show the same retro summary and follow-up direction.",
+      reviseHeadline: "마지막 수정이 한 번 더 필요합니다.",
+      reviseSummary: "문구상 큰 이슈가 하나 남아 있어 팀 공유 전에 한 번 더 다듬어야 합니다.",
+      readyHeadline: "최종 공유 판단만 남았습니다.",
+      readySummary: "검토는 완료되었고, 이제 운영자의 공유 결정만 남았습니다.",
+      sharedHeadline: "이 요약은 이미 공유되었습니다.",
+      sharedSummary: "Jira와 Confluence에 같은 회고 요약과 후속 방향이 보입니다.",
     },
   },
 ];
@@ -463,23 +463,23 @@ function scenarioById(taskId: string): TaskScenario {
 function statusLabel(state: TaskDisplayState): string {
   switch (state) {
     case "not_started":
-      return "Not started";
+      return "시작 전";
     case "brief_ready":
-      return "Brief ready";
+      return "브리프 준비";
     case "waiting_for_agent":
-      return "Waiting for response";
+      return "응답 대기";
     case "response_received":
-      return "Response received";
+      return "응답 수신";
     case "review_requested":
-      return "Review brief ready";
+      return "검토 브리프 준비";
     case "ready_for_decision":
-      return "Decision needed";
+      return "판단 필요";
     case "revise":
-      return "Revise";
+      return "수정 필요";
     case "shared":
-      return "Shared";
+      return "공유 완료";
     default:
-      return "In progress";
+      return "진행 중";
   }
 }
 
@@ -487,48 +487,48 @@ function nextAction(state: TaskDisplayState): { label: string; detail: string } 
   switch (state) {
     case "not_started":
       return {
-        label: "Brief ready",
-        detail: "Prepare the brief before you hand the task to your agent.",
+        label: "브리프 준비",
+        detail: "에이전트에게 넘기기 전에 먼저 브리프를 정리합니다.",
       };
     case "brief_ready":
       return {
-        label: "Send to agent",
-        detail: "The brief is ready. Send it to your agent to start the draft.",
+        label: "에이전트에 보내기",
+        detail: "브리프가 준비되었습니다. 에이전트에 보내 초안 작성을 시작합니다.",
       };
     case "waiting_for_agent":
       return {
-        label: "Receive response",
-        detail: "The handoff is out. Bring the response back into the workspace.",
+        label: "응답 받기",
+        detail: "handoff가 나간 상태입니다. 돌아온 응답을 다시 작업 공간으로 가져옵니다.",
       };
     case "response_received":
       return {
-        label: "Request review",
-        detail: "The draft is back. Prepare the next handoff for the Critic agent.",
+        label: "검토 요청",
+        detail: "초안이 돌아왔습니다. Critic 역할로 다음 handoff를 준비합니다.",
       };
     case "review_requested":
       return {
-        label: "Send to agent",
-        detail: "The Critic brief is ready. Send it and wait for the review.",
+        label: "에이전트에 보내기",
+        detail: "Critic 브리프가 준비되었습니다. 보내고 검토 결과를 기다립니다.",
       };
     case "ready_for_decision":
       return {
-        label: "Prepare team share",
-        detail: "Review is complete. Confirm the final share state for Jira and Confluence.",
+        label: "팀 공유 준비",
+        detail: "검토가 끝났습니다. Jira와 Confluence에 반영할 최종 공유 상태를 확인합니다.",
       };
     case "revise":
       return {
-        label: "Apply review",
-        detail: "Tighten the draft with the review feedback, then send it once more.",
+        label: "수정 반영",
+        detail: "검토 피드백을 반영해 초안을 다듬고 한 번 더 보냅니다.",
       };
     case "shared":
       return {
-        label: "Check share status",
-        detail: "The task has been shared. Confirm that the team sees the same final summary.",
+        label: "공유 상태 확인",
+        detail: "작업이 공유된 상태입니다. 팀이 같은 최종 요약을 보는지 확인합니다.",
       };
     default:
       return {
-        label: "Continue",
-        detail: "Move the task to the next stage.",
+        label: "계속 진행",
+        detail: "다음 단계로 작업을 이어갑니다.",
       };
   }
 }
@@ -536,21 +536,21 @@ function nextAction(state: TaskDisplayState): { label: string; detail: string } 
 function actionsForState(state: TaskDisplayState): TaskAction[] {
   switch (state) {
     case "not_started":
-      return [{ id: "prepare_brief", label: "Brief ready", helper: "Organize the brief for the next handoff.", kind: "primary", enabled: true }];
+      return [{ id: "prepare_brief", label: "브리프 준비", helper: "다음 handoff를 위해 브리프를 정리합니다.", kind: "primary", enabled: true }];
     case "brief_ready":
-      return [{ id: "mark_sent", label: "Send to agent", helper: "Send the brief and move to waiting.", kind: "primary", enabled: true }];
+      return [{ id: "mark_sent", label: "에이전트에 보내기", helper: "브리프를 보내고 응답 대기 상태로 넘깁니다.", kind: "primary", enabled: true }];
     case "waiting_for_agent":
-      return [{ id: "receive_result", label: "Receive response", helper: "Bring the agent response back into the workspace.", kind: "primary", enabled: true }];
+      return [{ id: "receive_result", label: "응답 받기", helper: "에이전트 응답을 다시 작업 공간으로 가져옵니다.", kind: "primary", enabled: true }];
     case "response_received":
-      return [{ id: "request_review", label: "Request review", helper: "Prepare the Critic handoff from the returned draft.", kind: "primary", enabled: true }];
+      return [{ id: "request_review", label: "검토 요청", helper: "돌아온 초안을 바탕으로 Critic handoff를 준비합니다.", kind: "primary", enabled: true }];
     case "review_requested":
-      return [{ id: "mark_sent", label: "Send to agent", helper: "Send the Critic brief and wait for the review.", kind: "primary", enabled: true }];
+      return [{ id: "mark_sent", label: "에이전트에 보내기", helper: "Critic 브리프를 보내고 검토 결과를 기다립니다.", kind: "primary", enabled: true }];
     case "ready_for_decision":
-      return [{ id: "confirm_share", label: "Prepare team share", helper: "Confirm the final share state for Jira and Confluence.", kind: "primary", enabled: true }];
+      return [{ id: "confirm_share", label: "팀 공유 준비", helper: "Jira와 Confluence의 최종 공유 상태를 확인합니다.", kind: "primary", enabled: true }];
     case "revise":
-      return [{ id: "apply_review", label: "Apply review", helper: "Use the review feedback and prepare one more pass.", kind: "primary", enabled: true }];
+      return [{ id: "apply_review", label: "수정 반영", helper: "검토 피드백을 반영해 한 번 더 다듬습니다.", kind: "primary", enabled: true }];
     case "shared":
-      return [{ id: "confirm_share", label: "Check share status", helper: "Review the final shared state.", kind: "primary", enabled: true }];
+      return [{ id: "confirm_share", label: "공유 상태 확인", helper: "최종 공유 상태를 다시 확인합니다.", kind: "primary", enabled: true }];
     default:
       return [];
   }
@@ -598,9 +598,9 @@ function reviewCopyForState(scenario: TaskScenario, state: TaskDisplayState) {
       headline: scenario.reviewCopy.reviseHeadline,
       summary: scenario.reviewCopy.reviseSummary,
       outcomeState: "revise" as const,
-      operatorDecisionLabel: "Revise before team share",
-      operatorDecisionDetail: "Use the review feedback to tighten the draft before publishing anything to the team.",
-      reviewChecklist: ["Clarify the missing owner.", "Close the schedule dependency.", "Run one more review pass before share."],
+      operatorDecisionLabel: "팀 공유 전 수정 필요",
+      operatorDecisionDetail: "팀에 게시하기 전에 검토 피드백을 반영해 초안을 한 번 더 다듬습니다.",
+      reviewChecklist: ["빠진 담당자를 명확히 합니다.", "일정 의존성을 정리합니다.", "공유 전에 한 번 더 검토를 돌립니다."],
     };
   }
 
@@ -609,9 +609,9 @@ function reviewCopyForState(scenario: TaskScenario, state: TaskDisplayState) {
       headline: scenario.reviewCopy.sharedHeadline,
       summary: scenario.reviewCopy.sharedSummary,
       outcomeState: "ready_for_decision" as const,
-      operatorDecisionLabel: "Shared state confirmed",
-      operatorDecisionDetail: "The operator has already confirmed the final share state and the team can now read the result in Jira and Confluence.",
-      reviewChecklist: ["Confirm the summary matches across systems.", "Check that the next action is visible.", "Share timing has already been confirmed."],
+      operatorDecisionLabel: "공유 상태 확인 완료",
+      operatorDecisionDetail: "운영자가 최종 공유 상태를 이미 확인했고, 이제 팀은 Jira와 Confluence에서 같은 결과를 볼 수 있습니다.",
+      reviewChecklist: ["두 시스템의 요약이 같은지 확인합니다.", "다음 행동이 잘 보이는지 확인합니다.", "공유 시점 확인이 완료되었습니다."],
     };
   }
 
@@ -619,12 +619,12 @@ function reviewCopyForState(scenario: TaskScenario, state: TaskDisplayState) {
     headline: scenario.reviewCopy.readyHeadline,
     summary: scenario.reviewCopy.readySummary,
     outcomeState: "ready_for_decision" as const,
-    operatorDecisionLabel: "Operator decision required",
-    operatorDecisionDetail: "The Critic review is complete. Confirm the share step once the summary and team-facing destination look right.",
+    operatorDecisionLabel: "운영자 최종 판단 필요",
+    operatorDecisionDetail: "Critic 검토는 끝났습니다. 이제 요약과 공유 대상을 확인한 뒤 마지막 공유 단계를 확정합니다.",
     reviewChecklist: [
-      "Check whether the summary is team-ready.",
-      "Confirm Jira and Confluence should show the same message.",
-      "Prepare the final team-share update.",
+      "이 요약이 팀에게 바로 전달 가능한지 확인합니다.",
+      "Jira와 Confluence에 같은 메시지가 반영되는지 확인합니다.",
+      "최종 팀 공유 업데이트를 준비합니다.",
     ],
   };
 }
@@ -646,13 +646,13 @@ function connectedAgentsForRuntime(scenario: TaskScenario, runtime: TaskRuntime)
 
       if (isActive && isWaitingStage && agent.roleId !== "ops") {
         status = "reviewing";
-        statusNote = "Waiting for the response from this agent.";
+        statusNote = "이 에이전트의 응답이 돌아오기를 기다리고 있습니다.";
       } else if (isActive && !isWaitingStage && agent.roleId !== "ops") {
         status = "connected";
-        statusNote = "This is the active role for the current stage.";
+        statusNote = "현재 단계에서 실제로 사용하는 역할입니다.";
       } else if (agent.roleId === "ops" && (runtime.displayState === "ready_for_decision" || runtime.displayState === "shared")) {
         status = "connected";
-        statusNote = "Ready to confirm the final team-share state.";
+        statusNote = "최종 팀 공유 상태를 확인할 준비가 되어 있습니다.";
       }
 
       return {
@@ -833,8 +833,8 @@ export function setTaskHandoffMode(product: ProductExperience, taskId: string, m
 export const initialProductExperience: ProductExperience = {
   title: "AI_Japan_project",
   subtitle: "A connected-agent workspace for continuing project work from shared context.",
-  workspaceLabel: "Connected-agent workspace",
-  workspaceTagline: "Structured context in, role-based work out, team-sharing state at the end.",
+  workspaceLabel: "개인 에이전트 작업 공간",
+  workspaceTagline: "구조화된 맥락을 바탕으로 역할별 작업을 이어가고, 마지막에는 팀 공유 상태로 정리합니다.",
   agents: AGENTS,
   tasks: SCENARIOS.map((scenario) => createTaskRecord(scenario, INITIAL_RUNTIME[scenario.id])),
 };

@@ -16,11 +16,11 @@ function taskReference(task: TaskRecord): string {
 export function ReviewResultScreen({ onOpenContext, onTriggerAction, task }: ReviewResultScreenProps) {
   const primaryAction = task.actions.find((action) => action.kind === "primary");
   const reviewStateLabel =
-    task.displayState === "shared" ? "Shared" : task.reviewOutcomeState === "revise" ? "Revise needed" : "Decision needed";
+    task.displayState === "shared" ? "공유 완료" : task.reviewOutcomeState === "revise" ? "수정 필요" : "판단 필요";
   const reviewDescription =
     task.displayState === "shared"
-      ? "The final summary is already shared. Use this view to confirm the team sees the same update across Jira and Confluence."
-      : "Review what came back, decide whether to share now, and lock the team-facing update.";
+      ? "최종 요약이 이미 공유된 상태입니다. Jira와 Confluence에서 팀이 같은 내용을 보는지 확인합니다."
+      : "돌아온 결과를 검토하고, 지금 공유할지 여부를 판단해 팀 공유 상태를 확정합니다.";
 
   return (
     <section className="review-screen">
@@ -31,7 +31,7 @@ export function ReviewResultScreen({ onOpenContext, onTriggerAction, task }: Rev
             <span className="status-dot" />
             {reviewStateLabel}
           </span>
-          <span className="sprint-tag">Review &amp; Share</span>
+          <span className="sprint-tag">검토 및 공유</span>
         </div>
 
         <h2 className="task-h1">{task.title}</h2>
@@ -48,7 +48,7 @@ export function ReviewResultScreen({ onOpenContext, onTriggerAction, task }: Rev
             </button>
           ) : null}
           <button className="button button--secondary" onClick={onOpenContext} type="button">
-            Open context
+            맥락 열기
           </button>
         </div>
 

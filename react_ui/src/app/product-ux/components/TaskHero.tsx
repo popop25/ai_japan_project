@@ -26,11 +26,11 @@ export function TaskHero({ task }: TaskHeroProps) {
       </header>
 
       <section className="col-main">
-        <div className="section-header">Task context</div>
+        <div className="section-header">작업 맥락</div>
 
         <div className="props">
           <article className="prop">
-            <div className="prop-label">Project</div>
+            <div className="prop-label">프로젝트</div>
             <div className="prop-value">{task.account}</div>
           </article>
 
@@ -46,15 +46,15 @@ export function TaskHero({ task }: TaskHeroProps) {
           <div className="prop-divider" />
 
           <article className="prop">
-            <div className="prop-label">Output expectation</div>
+            <div className="prop-label">출력 기준</div>
             <div className="prop-value">{task.activeBrief.expectedResponse}</div>
-            <div className="prop-value muted">Shared with the team once the operator confirms the final step.</div>
+            <div className="prop-value muted">운영자가 마지막 공유 단계를 확인하면 팀과 공유됩니다.</div>
           </article>
 
           <div className="prop-divider" />
 
           <article className="prop">
-            <div className="prop-label">Reference notes</div>
+            <div className="prop-label">참고 문서</div>
             <div className="file-list">
               {task.sources.map((source) => (
                 <article key={source.id} className="file-row">

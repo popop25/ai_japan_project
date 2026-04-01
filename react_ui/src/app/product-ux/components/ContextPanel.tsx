@@ -8,8 +8,8 @@ export function ContextPanel({ task }: ContextPanelProps) {
   return (
     <section className="drawer-panel">
       <div className="section-heading">
-        <span className="eyebrow">Context</span>
-        <h3>What this task is grounded in</h3>
+        <span className="eyebrow">맥락</span>
+        <h3>이 작업이 기대고 있는 배경 정보</h3>
       </div>
 
       <div className="context-list">
@@ -22,7 +22,7 @@ export function ContextPanel({ task }: ContextPanelProps) {
       </div>
 
       <div className="source-section">
-        <span className="eyebrow">Source notes</span>
+        <span className="eyebrow">참고 문서</span>
         <div className="source-list">
           {task.sources.map((source) => (
             <article key={source.id} className="source-item">

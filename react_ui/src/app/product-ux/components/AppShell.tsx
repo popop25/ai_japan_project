@@ -6,9 +6,9 @@ import { ContextPanel } from "./ContextPanel";
 import { WorkboardList } from "./WorkboardList";
 
 const STAGES: Array<{ id: ProductViewId; label: string }> = [
-  { id: "task", label: "Task" },
-  { id: "handoff", label: "Agent Handoff" },
-  { id: "review", label: "Review & Share" },
+  { id: "task", label: "작업" },
+  { id: "handoff", label: "에이전트 전달" },
+  { id: "review", label: "검토 및 공유" },
 ];
 
 interface AppShellProps {
@@ -53,10 +53,10 @@ export function AppShell({
             </div>
           ))}
           <button className="utility-btn" onClick={() => onTaskPickerOpenChange(true)} type="button">
-            Task picker
+            작업 선택
           </button>
           <button className="utility-btn" onClick={() => onContextOpenChange(true)} type="button">
-            Context
+            맥락
           </button>
         </div>
       </header>
@@ -77,10 +77,9 @@ export function AppShell({
         <main className="stage-canvas">{children}</main>
 
         <footer className="demo-note">
-          <span className="eyebrow">Demo scope</span>
+          <span className="eyebrow">데모 범위</span>
           <p>
-            This demo stays honest about manual handoff. The workspace prepares the next move, and the user uses their own
-            agent to continue the work.
+            이 데모는 수동 handoff를 그대로 드러냅니다. 작업 공간은 다음 행동을 정리해주고, 실제 작업은 사용자의 에이전트가 이어서 수행합니다.
           </p>
         </footer>
       </div>
@@ -91,12 +90,12 @@ export function AppShell({
           <Dialog.Content className="drawer drawer--left">
             <div className="drawer__header">
               <div>
-                <Dialog.Title>Task picker</Dialog.Title>
-                <Dialog.Description>Choose the task you want to continue now.</Dialog.Description>
+                <Dialog.Title>작업 선택</Dialog.Title>
+                <Dialog.Description>지금 이어서 진행할 작업을 고르세요.</Dialog.Description>
               </div>
               <Dialog.Close asChild>
                 <button className="drawer__close" type="button" aria-label="Close task picker">
-                  Close
+                  닫기
                 </button>
               </Dialog.Close>
             </div>
@@ -111,12 +110,12 @@ export function AppShell({
           <Dialog.Content className="drawer drawer--right">
             <div className="drawer__header">
               <div>
-                <Dialog.Title>Task context</Dialog.Title>
-                <Dialog.Description>Review the context and source notes behind the current task.</Dialog.Description>
+                <Dialog.Title>작업 맥락</Dialog.Title>
+                <Dialog.Description>현재 작업의 배경 맥락과 참고 문서를 확인합니다.</Dialog.Description>
               </div>
               <Dialog.Close asChild>
                 <button className="drawer__close" type="button" aria-label="Close context panel">
-                  Close
+                  닫기
                 </button>
               </Dialog.Close>
             </div>
