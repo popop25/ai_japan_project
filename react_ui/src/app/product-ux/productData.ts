@@ -57,16 +57,21 @@ interface TaskRuntime {
   updatedAt: string;
 }
 
+const DEMO_DRAFT_REQUEST_PATH = "project/runs/demo_requirements_draft_request.md";
+const DEMO_DRAFT_OUTPUT_PATH = "project/artifacts/demo_requirements_draft.md";
+const DEMO_REVIEW_REQUEST_PATH = "project/runs/demo_requirements_review_request.md";
+const DEMO_REVIEW_OUTPUT_PATH = "project/artifacts/demo_requirements_review.md";
+
 const HANDOFF_MODES: HandoffModeOption[] = [
-  {
-    id: "copy_paste",
-    label: "복사 후 붙여넣기",
-    helper: "브리프를 에이전트 채팅에 붙여넣고, 작업이 끝나면 이 화면으로 돌아와 다음 단계를 확인합니다.",
-  },
   {
     id: "file_handoff",
     label: "파일 handoff",
-    helper: "브리프 파일 경로를 전달하고, 결과가 준비되면 이 화면에서 다음 단계를 확인합니다.",
+    helper: "요청 파일 경로를 전달하고, 결과 파일이 준비되면 이 화면으로 돌아와 다음 단계를 확인합니다.",
+  },
+  {
+    id: "copy_paste",
+    label: "복사 후 붙여넣기",
+    helper: "보조 옵션입니다. 브리프를 에이전트 채팅에 붙여넣고, 작업이 끝나면 이 화면으로 돌아와 다음 단계를 확인합니다.",
   },
 ];
 
@@ -112,52 +117,52 @@ const SCENARIOS: TaskScenario[] = [
   {
     id: "task-japan-launch",
     isPrimaryDemo: true,
-    title: "일본 런치 브리프",
-    account: "AI Japan launch",
-    summary: "내일 런치 점검 전에 팀이 빠르게 읽고 맞출 수 있는 짧은 브리프를 준비합니다.",
-    objective: "첫 초안을 팀에 공유하기 전에 범위, 빠진 담당자, 마지막 결정 포인트를 확인합니다.",
+    title: "점포 운영 AI 적용 범위 정리",
+    account: "점포 운영 DX 파일럿",
+    summary: "점포 운영 문의 대응 업무를 기준으로, 1차 적용 범위와 요구사항 정의서 초안을 정리합니다.",
+    objective: "반복 문의 패턴을 기준으로 도입 범위, 빠진 담당자, 팀 공유 전에 남은 결정 사항을 정리합니다.",
     dueLabel: "오늘 18:00 KST",
     urgency: "오늘 검토 전에 초안이 필요합니다",
     initialState: "brief_ready",
     initialRole: "pm",
-    initialHandoffMode: "copy_paste",
+    initialHandoffMode: "file_handoff",
     reviewOutcomeState: "ready_for_decision",
     connectedAgentIds: ["pm-agent", "critic-agent", "ops-agent"],
     pmBrief: {
       roleId: "pm",
       roleLabel: "PM Agent",
-      title: "일본 런치 PM 브리프",
-      instruction: "팀이 한 번에 읽고 반응할 수 있는 짧은 런치 브리프를 준비합니다.",
-      body: `# 일본 런치 PM 브리프
+      title: "요구사항 정의서 초안 준비",
+      instruction: "점포 운영 문의 대응 업무를 기준으로 첫 적용 범위와 요구사항 정의서 초안을 정리합니다.",
+      body: `# 요구사항 정의서 초안 준비
 
 목표
-- 런치 범위를 한 문단으로 정리합니다.
-- 빠진 담당자나 막힌 요소를 분리해서 적습니다.
-- 팀 공유 전에 남은 마지막 결정 포인트를 끝에 정리합니다.
+- 점포 운영 문의 대응 업무를 기준으로 첫 적용 범위를 정리합니다.
+- 비개발자 팀이 직접 운영할 수 있는 수준으로 요구사항을 묶습니다.
+- 팀 공유 전에 남은 결정 사항과 빠진 담당자를 끝에 정리합니다.
 
 출력
-- 브리프 초안 1개
+- 요구사항 정의서 초안 1개
 - 열린 질문 목록 1개`,
       checklist: [
-        "런치 목표와 범위를 분명하게 적습니다.",
-        "빠진 담당자와 블로커를 구분합니다.",
-        "팀이 바로 판단해야 할 다음 결정을 끝에 남깁니다.",
+        "적용 범위와 운영 목표를 한 번에 읽히게 적습니다.",
+        "빠진 담당자와 결정이 필요한 항목을 구분합니다.",
+        "팀 공유 전에 확인할 마지막 판단 포인트를 끝에 남깁니다.",
       ],
-      expectedResponse: "브리프 초안 1개와 열린 질문 목록 1개",
-      contextIncluded: ["03_Context 요약", "런치 의사결정 메모", "현재 Jira 작업 상태"],
-      handoffPath: "project/runs/japan-launch-brief.md",
-      responsePath: "launch-brief-response.md",
+      expectedResponse: "요구사항 정의서 초안 1개와 열린 질문 목록 1개",
+      contextIncluded: ["03_Context", "점포 운영 인터뷰 메모", "현재 Jira 작업 상태"],
+      handoffPath: DEMO_DRAFT_REQUEST_PATH,
+      responsePath: DEMO_DRAFT_OUTPUT_PATH,
     },
     criticBrief: {
       roleId: "critic",
       roleLabel: "Critic Agent",
-      title: "일본 런치 Critic 브리프",
-      instruction: "PM 초안에서 빠진 담당자, 블로커, 팀 공유 준비 상태를 검토합니다.",
-      body: `# 일본 런치 Critic 브리프
+      title: "요구사항 초안 검토 요청",
+      instruction: "초안이 팀 공유 가능한 수준인지, 빠진 담당자와 결정이 없는지 검토합니다.",
+      body: `# 요구사항 초안 검토 요청
 
 PM 초안을 읽고 아래를 확인합니다.
-- 팀과 공유하기 전에 아직 빠진 내용이 있는가?
-- 운영자와 PM이 이해하기에 충분히 명확한가?
+- 점포 운영 팀과 공유하기 전에 아직 빠진 내용이 있는가?
+- 비개발자 운영팀이 읽어도 충분히 명확한가?
 - 지금 공유해도 되는가, 아니면 한 번 더 수정해야 하는가?
 
 출력
@@ -165,62 +170,62 @@ PM 초안을 읽고 아래를 확인합니다.
 - 요약
 - 권장 수정 사항`,
       checklist: [
-        "빠진 담당자나 막힌 결정을 짚어줍니다.",
+        "빠진 담당자나 미확정 결정을 짚어줍니다.",
         "지금 팀 공유가 가능한지 판단합니다.",
         "운영자의 다음 행동을 추천합니다.",
       ],
       expectedResponse: "짧은 검토 verdict와 권장 수정 사항",
-      contextIncluded: ["PM 초안", "런치 목표", "팀 공유 기준"],
-      handoffPath: "project/runs/japan-launch-review.md",
-      responsePath: "launch-review-response.md",
+      contextIncluded: ["요구사항 정의서 초안", "03_Context", "팀 공유 기준"],
+      handoffPath: DEMO_REVIEW_REQUEST_PATH,
+      responsePath: DEMO_REVIEW_OUTPUT_PATH,
     },
     pmResult: {
       id: "result-japan-launch-draft",
-      title: "런치 브리프 초안 v1",
+      title: "요구사항 정의서 초안",
       fromAgentLabel: "My Codex",
-      summary: "런치 범위, 빠진 담당자, 마지막 공유 판단을 담은 1페이지 초안을 작성했습니다.",
+      summary: "1차 적용 범위, 빠진 담당자, 팀 공유 전에 확인할 결정 사항을 정리했습니다.",
       status: "ready",
       updatedAt: "방금 전",
     },
     criticResult: {
       id: "result-japan-launch-review",
-      title: "런치 브리프 검토",
+      title: "요구사항 초안 검토 의견",
       fromAgentLabel: "My Claude",
-      summary: "팀 공유 전에 담당자 공백 1건과 일정 의존성 1건을 더 확인해야 합니다.",
+      summary: "팀 공유 전에 담당자 공백 1건과 운영 의존성 1건을 더 확인해야 합니다.",
       status: "review",
       updatedAt: "방금 전",
     },
     contextEntries: [
-      { id: "japan-goal", label: "목표", value: "내일 플래닝 리뷰 전에 런치 팀이 바로 맞출 수 있는 브리프 1개를 만든다." },
-      { id: "japan-gap", label: "열린 이슈", value: "법무 담당자와 매장 롤아웃 의존성이 아직 완전히 확정되지 않았다." },
-      { id: "japan-share", label: "공유 기준", value: "Jira와 Confluence에 같은 다음 행동이 보이도록 정리한다." },
+      { id: "japan-goal", label: "목표", value: "반복 문의 대응 업무를 기준으로 첫 적용 범위와 운영 원칙을 한 장으로 정리한다." },
+      { id: "japan-gap", label: "열린 이슈", value: "법무 검토 범위와 매장 운영팀 승인 순서가 아직 완전히 확정되지 않았다." },
+      { id: "japan-share", label: "공유 기준", value: "Jira와 Confluence에 같은 요약과 같은 다음 행동이 보이도록 정리한다." },
     ],
     sources: [
-      { id: "japan-source-context", title: "03_Context", type: "Confluence", freshness: "오늘 업데이트", note: "런치 제약 사항과 범위 기준" },
+      { id: "japan-source-context", title: "03_Context", type: "Confluence", freshness: "오늘 업데이트", note: "점포 운영 제약 사항과 범위 기준" },
       { id: "japan-source-task", title: "KAN-9", type: "Jira", freshness: "12분 전 업데이트", note: "현재 작업 담당자와 마감 일정" },
-      { id: "japan-source-note", title: "런치 운영 메모", type: "Workspace note", freshness: "오늘 오전 수정", note: "빠진 담당자와 팀 공유 기준" },
+      { id: "japan-source-note", title: "점포 운영 인터뷰 메모", type: "Workspace note", freshness: "오늘 오전 수정", note: "반복 문의 패턴과 빠진 담당자" },
     ],
     shareStates: {
       working: [
-        { system: "Jira", label: "팀 공유용 정리 중", detail: "작업은 진행 중이지만 팀이 볼 최종 요약은 아직 게시되지 않았습니다.", tone: "healthy", updatedAt: "2분 전" },
-        { system: "Confluence", label: "초안 공유 전", detail: "검토된 초안이 올라오기 전이라 공유 페이지가 아직 대기 중입니다.", tone: "pending", updatedAt: "아직 게시 전" },
+        { system: "Jira", label: "팀 공유용 정리 중", detail: "작업은 진행 중이지만 팀이 볼 최종 요구사항 요약은 아직 게시되지 않았습니다.", tone: "healthy", updatedAt: "2분 전" },
+        { system: "Confluence", label: "초안 공유 전", detail: "검토된 요구사항 초안이 올라오기 전이라 공유 페이지가 아직 대기 중입니다.", tone: "pending", updatedAt: "아직 게시 전" },
       ],
       ready: [
         { system: "Jira", label: "팀 공유 확인 대기", detail: "최신 초안과 검토 결과가 작업에 연결되어 있고 운영자 확인만 남았습니다.", tone: "healthy", updatedAt: "방금 전" },
-        { system: "Confluence", label: "공유 여부 판단 대기", detail: "페이지는 준비되었지만 운영자가 공유 여부를 아직 결정하지 않았습니다.", tone: "attention", updatedAt: "판단 대기" },
+        { system: "Confluence", label: "공유 여부 판단 대기", detail: "정의서 페이지는 준비되었지만 운영자가 공유 여부를 아직 결정하지 않았습니다.", tone: "attention", updatedAt: "판단 대기" },
       ],
       shared: [
-        { system: "Jira", label: "팀과 공유됨", detail: "최신 요약과 다음 행동이 Jira 작업에서 바로 보입니다.", tone: "healthy", updatedAt: "방금 전" },
-        { system: "Confluence", label: "팀과 공유됨", detail: "런치 팀이 한곳에서 읽을 수 있도록 브리프가 게시되었습니다.", tone: "healthy", updatedAt: "방금 전" },
+        { system: "Jira", label: "팀과 공유됨", detail: "최신 요구사항 요약과 다음 행동이 Jira 작업에서 바로 보입니다.", tone: "healthy", updatedAt: "방금 전" },
+        { system: "Confluence", label: "팀과 공유됨", detail: "점포 운영팀이 한곳에서 읽을 수 있도록 요구사항 초안이 게시되었습니다.", tone: "healthy", updatedAt: "방금 전" },
       ],
     },
     reviewCopy: {
       reviseHeadline: "한 번 더 수정이 필요합니다.",
-      reviseSummary: "검토 결과 빠진 담당자와 일정 의존성이 남아 있어 팀 공유 전에 초안을 한 번 더 다듬어야 합니다.",
+      reviseSummary: "검토 결과 빠진 담당자와 운영 의존성이 남아 있어 팀 공유 전에 초안을 한 번 더 다듬어야 합니다.",
       readyHeadline: "최종 팀 공유 판단만 남았습니다.",
       readySummary: "검토는 끝났고, 이제 운영자가 마지막 공유 여부를 확인하면 됩니다.",
       sharedHeadline: "최신 버전이 이미 공유되었습니다.",
-      sharedSummary: "Jira와 Confluence에 같은 요약과 같은 다음 행동이 반영되어 있습니다.",
+      sharedSummary: "Jira와 Confluence에 같은 요구사항 요약과 같은 다음 행동이 반영되어 있습니다.",
     },
   },
   {
@@ -467,11 +472,11 @@ function statusLabel(state: TaskDisplayState): string {
     case "brief_ready":
       return "브리프 준비";
     case "waiting_for_agent":
-      return "응답 대기";
+      return "작업 진행 중";
     case "response_received":
-      return "응답 수신";
+      return "작업 완료 확인";
     case "review_requested":
-      return "검토 브리프 준비";
+      return "검토 요청 준비";
     case "ready_for_decision":
       return "판단 필요";
     case "revise":
@@ -493,12 +498,12 @@ function nextAction(state: TaskDisplayState): { label: string; detail: string } 
     case "brief_ready":
       return {
         label: "에이전트에 보내기",
-        detail: "브리프가 준비되었습니다. 에이전트에 보내 초안 작성을 시작합니다.",
+        detail: "요청 파일이 준비되었습니다. 내 에이전트에 전달해 초안 작성을 시작합니다.",
       };
     case "waiting_for_agent":
       return {
-        label: "응답 준비됨 확인",
-        detail: "handoff가 나간 상태입니다. 내 에이전트 작업이 끝났는지 확인하고 다음 단계로 넘깁니다.",
+        label: "작업 완료 확인",
+        detail: "handoff가 나간 상태입니다. 내 에이전트가 결과 파일을 남겼는지 확인하고 다음 단계로 넘깁니다.",
       };
     case "response_received":
       return {
@@ -508,7 +513,7 @@ function nextAction(state: TaskDisplayState): { label: string; detail: string } 
     case "review_requested":
       return {
         label: "에이전트에 보내기",
-        detail: "Critic 브리프가 준비되었습니다. 보내고 검토 결과를 기다립니다.",
+        detail: "검토 요청 파일이 준비되었습니다. Critic 에이전트에 보내고 검토 결과를 기다립니다.",
       };
     case "ready_for_decision":
       return {
@@ -538,13 +543,13 @@ function actionsForState(state: TaskDisplayState): TaskAction[] {
     case "not_started":
       return [{ id: "prepare_brief", label: "브리프 준비", helper: "다음 handoff를 위해 브리프를 정리합니다.", kind: "primary", enabled: true }];
     case "brief_ready":
-      return [{ id: "mark_sent", label: "에이전트에 보내기", helper: "브리프를 보내고 응답 대기 상태로 넘깁니다.", kind: "primary", enabled: true }];
+      return [{ id: "mark_sent", label: "에이전트에 보내기", helper: "요청 파일을 전달하고 작업 대기 상태로 넘깁니다.", kind: "primary", enabled: true }];
     case "waiting_for_agent":
-      return [{ id: "receive_result", label: "응답 준비됨 확인", helper: "내 에이전트 작업이 끝났는지 확인하고 다음 단계로 진행합니다.", kind: "primary", enabled: true }];
+      return [{ id: "receive_result", label: "작업 완료 확인", helper: "내 에이전트가 결과 파일을 남겼는지 확인하고 다음 단계로 진행합니다.", kind: "primary", enabled: true }];
     case "response_received":
       return [{ id: "request_review", label: "검토 요청", helper: "PM 초안을 기준으로 Critic handoff를 준비합니다.", kind: "primary", enabled: true }];
     case "review_requested":
-      return [{ id: "mark_sent", label: "에이전트에 보내기", helper: "Critic 브리프를 보내고 검토 결과를 기다립니다.", kind: "primary", enabled: true }];
+      return [{ id: "mark_sent", label: "에이전트에 보내기", helper: "검토 요청 파일을 전달하고 검토 결과를 기다립니다.", kind: "primary", enabled: true }];
     case "ready_for_decision":
       return [{ id: "confirm_share", label: "팀 공유 준비", helper: "Jira와 Confluence에 보여줄 최종 공유 상태를 확인합니다.", kind: "primary", enabled: true }];
     case "revise":
@@ -646,7 +651,7 @@ function connectedAgentsForRuntime(scenario: TaskScenario, runtime: TaskRuntime)
 
       if (isActive && isWaitingStage && agent.roleId !== "ops") {
         status = "reviewing";
-        statusNote = "이 에이전트의 응답이 돌아오기를 기다리고 있습니다.";
+        statusNote = "이 에이전트가 결과 파일을 남기기를 기다리고 있습니다.";
       } else if (isActive && !isWaitingStage && agent.roleId !== "ops") {
         status = "connected";
         statusNote = "현재 단계에서 실제로 사용하는 역할입니다.";
@@ -832,9 +837,9 @@ export function setTaskHandoffMode(product: ProductExperience, taskId: string, m
 
 export const initialProductExperience: ProductExperience = {
   title: "AI_Japan_project",
-  subtitle: "A connected-agent workspace for continuing project work from shared context.",
+  subtitle: "구조화된 프로젝트 맥락을 바탕으로 개인 에이전트가 작업을 이어가는 연결형 작업 공간",
   workspaceLabel: "개인 에이전트 작업 공간",
-  workspaceTagline: "구조화된 맥락을 바탕으로 역할별 작업을 이어가고, 마지막에는 팀 공유 상태로 정리합니다.",
+  workspaceTagline: "구조화된 맥락을 바탕으로 에이전트 handoff를 준비하고, 마지막에는 팀 공유 상태를 확인합니다.",
   agents: AGENTS,
   tasks: SCENARIOS.map((scenario) => createTaskRecord(scenario, INITIAL_RUNTIME[scenario.id])),
 };

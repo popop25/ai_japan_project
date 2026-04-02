@@ -619,6 +619,38 @@ ul {
   padding-top: 12px;
 }
 
+.path-contract {
+  display: grid;
+  gap: 12px;
+  margin-top: 4px;
+}
+
+.path-contract__item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  background: var(--surface-strong);
+}
+
+.path-contract__label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.path-contract code {
+  display: block;
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.7;
+  word-break: break-all;
+}
+
 .wf-list {
   display: flex;
   flex-direction: column;

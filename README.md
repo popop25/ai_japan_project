@@ -24,7 +24,8 @@ The current cycle is React-first and reference-driven.
   - current demo surface
   - fixture-based connected-agent workspace
   - 3-step happy path: `Task -> Agent Handoff -> Review & Share`
-  - explicit manual handoff with `copy_paste` and `file_handoff`
+  - file-first manual handoff with `file_handoff` as the main demo path
+  - `copy_paste` remains as a secondary fallback
   - visual direction: Obsidian-led document surface, ArgoCD-style state clarity, Atlassian-style team-sharing cues
 - `app_ui/`
   - frozen internal fallback
@@ -64,11 +65,13 @@ That means the user brings their own agent product such as Codex or Claude and u
 
 The current demo supports these handoff patterns conceptually:
 
-- `copy_paste`
 - `file_handoff`
+- `copy_paste`
 
-The app prepares the brief and the user performs the actual handoff manually in their own agent.
-The demo then moves forward by confirming the next stage, not by pretending the React app owns the full result-ingest loop.
+The main demo path is `file_handoff`.
+
+The workspace prepares a stable request file, the user lets their own agent read it, and the agent leaves the result in a stable output file.
+The React demo then moves forward by confirming the next stage, not by pretending the UI owns the full output-handling loop.
 
 ## Repository Map
 
@@ -82,6 +85,19 @@ The demo then moves forward by confirming the next stage, not by pretending the 
   - readiness, smoke, and cleanup entry points
 - `docs/`
   - architecture and product-direction notes
+
+## Prepare The React Demo Handoff Files
+
+```powershell
+python scripts/prepare_react_demo_handoff.py
+```
+
+This writes the stable demo runtime files used by the personal-agent flow:
+
+- `project/runs/demo_requirements_draft_request.md`
+- `project/runs/demo_requirements_review_request.md`
+- `project/artifacts/demo_requirements_draft.md`
+- `project/artifacts/demo_requirements_review.md`
 
 ## Run The React Demo
 

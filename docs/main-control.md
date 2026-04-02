@@ -18,9 +18,10 @@ We are moving faster by executing this reset in one thread.
 - Stable baseline: `main@5dee3cc`
 - Active branch for the current cycle: `main`
 - Current demo surface: `react_ui/`
-- Current product stance: `React-first`, `fixture-based`, `manual handoff`
+- Current product stance: `React-first`, `fixture-based`, `file-first manual handoff`
 - Current design stance: `Light-first`, `Obsidian-led`, `Custom + Radix`
 - Current demo target: `React workspace + personal agent + shared destination preview`
+- Current handoff contract: stable request files in `project/runs/` and stable output files in `project/artifacts/`
 - Streamlit status: frozen internal fallback
 - Python harness status: still authoritative for future live integration boundaries
 
@@ -55,6 +56,7 @@ Specifically:
 - Task picker and Context are support panels, not separate full screens.
 - The first connection model is `personal_agent`.
 - The demo remains honest: handoff is manual, not automatic.
+- The primary demo path is `file_handoff`.
 - The demo does not require React-side result upload for this cycle.
 - Internal implementation terms must not lead the UI.
   - avoid `packet`

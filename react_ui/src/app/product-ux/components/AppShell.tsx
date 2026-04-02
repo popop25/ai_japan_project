@@ -79,7 +79,7 @@ export function AppShell({
         <footer className="demo-note">
           <span className="eyebrow">데모 범위</span>
           <p>
-            이 데모는 수동 handoff를 그대로 드러냅니다. 작업 공간은 다음 행동을 정리해주고, 실제 작업은 사용자의 에이전트가 이어서 수행합니다.
+            이 데모는 수동 handoff를 그대로 드러냅니다. 작업 공간은 요청 파일과 결과 경로를 정리해주고, 실제 작업은 사용자의 에이전트가 이어서 수행합니다.
           </p>
         </footer>
       </div>

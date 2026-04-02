@@ -28,7 +28,7 @@ export function ResultInbox({ task }: ResultInboxProps) {
             <article key={result.id} className="result-document-item">
               <div className="result-document-item__topline">
                 <div>
-                  <span className="prop-label">응답 주체</span>
+                  <span className="prop-label">작업 주체</span>
                   <div className="result-document-item__title">{result.title}</div>
                 </div>
                 <span className={`state-chip state-chip--${result.status}`}>{resultStatusLabel(result.status)}</span>
@@ -42,8 +42,8 @@ export function ResultInbox({ task }: ResultInboxProps) {
           ))
         ) : (
           <article className="result-document-item result-document-item--empty">
-            <strong>아직 돌아온 응답이 없습니다.</strong>
-            <p>이 작업 공간은 다음 결과가 사용자의 에이전트에서 돌아오기를 기다리고 있습니다.</p>
+            <strong>아직 확인된 작업 결과가 없습니다.</strong>
+            <p>이 작업 공간은 다음 결과가 사용자의 에이전트에서 준비되기를 기다리고 있습니다.</p>
           </article>
         )}
       </div>

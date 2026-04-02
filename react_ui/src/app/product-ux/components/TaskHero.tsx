@@ -48,7 +48,7 @@ export function TaskHero({ task }: TaskHeroProps) {
           <article className="prop">
             <div className="prop-label">출력 기준</div>
             <div className="prop-value">{task.activeBrief.expectedResponse}</div>
-            <div className="prop-value muted">운영자가 마지막 공유 단계를 확인하면 팀과 공유됩니다.</div>
+            <div className="prop-value muted">작업 결과가 준비되면 운영자가 마지막 공유 단계를 확인합니다.</div>
           </article>
 
           <div className="prop-divider" />

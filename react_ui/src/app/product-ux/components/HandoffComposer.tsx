@@ -41,10 +41,10 @@ export function HandoffComposer({ onChangeHandoffMode, onOpenContext, onTriggerA
         </article>
 
         <section className="handoff-subsection">
-          <div className="section-header">응답 기준</div>
+          <div className="section-header">완료 기준</div>
           <div className="props props--compact">
             <article className="prop">
-              <div className="prop-label">기대 응답</div>
+              <div className="prop-label">기대 결과</div>
               <div className="prop-value">{task.activeBrief.expectedResponse}</div>
             </article>
 
@@ -64,6 +64,22 @@ export function HandoffComposer({ onChangeHandoffMode, onOpenContext, onTriggerA
             <article className="prop">
               <div className="prop-label">포함된 맥락</div>
               <div className="prop-value muted">{task.activeBrief.contextIncluded.join(", ")}</div>
+            </article>
+
+            <div className="prop-divider" />
+
+            <article className="prop">
+              <div className="prop-label">파일 handoff 경로</div>
+              <div className="path-contract">
+                <div className="path-contract__item">
+                  <span className="path-contract__label">읽을 파일</span>
+                  <code>{task.activeBrief.handoffPath}</code>
+                </div>
+                <div className="path-contract__item">
+                  <span className="path-contract__label">결과 파일</span>
+                  <code>{task.activeBrief.responsePath}</code>
+                </div>
+              </div>
             </article>
           </div>
         </section>
@@ -111,15 +127,15 @@ export function HandoffComposer({ onChangeHandoffMode, onOpenContext, onTriggerA
               <article className="status-block">
                 <span className="eyebrow">다음 단계에서 확인할 결과</span>
                 <strong>{task.activeBrief.expectedResponse}</strong>
-                <p>내 에이전트 작업이 끝나면 이 결과가 준비됐는지만 확인하고 다음 단계로 넘어갑니다.</p>
+                <p>내 에이전트가 결과 파일을 남기면, 이 작업 공간에서는 완료 여부만 확인하고 다음 단계로 넘어갑니다.</p>
               </article>
 
               <article className="status-block status-block--muted">
                 <span className="eyebrow">수동 handoff</span>
-                <strong>{task.handoffMode === "file_handoff" ? "파일 경로로 handoff를 이어갑니다." : "내 에이전트 채팅에서 작업을 이어갑니다."}</strong>
+                <strong>{task.handoffMode === "file_handoff" ? "이 요청 파일을 읽고 결과 파일을 남기게 합니다." : "내 에이전트 채팅에서 작업을 이어갑니다."}</strong>
                 <p>
                   {task.handoffMode === "file_handoff"
-                    ? `${task.activeBrief.handoffPath}를 전달한 뒤, 결과가 준비되면 이 작업 공간으로 돌아와 다음 단계를 확인합니다.`
+                    ? `${task.activeBrief.handoffPath}를 전달하고 ${task.activeBrief.responsePath}에 결과가 남으면, 이 작업 공간으로 돌아와 다음 단계를 확인합니다.`
                     : "브리프를 자신의 에이전트 채팅에 붙여넣고, 작업이 끝나면 이 작업 공간으로 돌아와 다음 단계를 확인합니다."}
                 </p>
               </article>

@@ -2,113 +2,94 @@
 
 ## Core Idea
 
-`AI_Japan_project` is not the agent itself. It is the orchestration surface around the agent.
+`AI_Japan_project` is not the agent itself. It is the workspace around the agent.
 
-The harness handles:
+The React demo does three things:
 
-- context
-- tasks
-- packets
-- artifacts
-- Jira / Confluence synchronization
+- shows the current task and the next handoff
+- shows which agent role should take the next step
+- shows where the team-facing result is expected to land
 
-Your own agent handles:
+The personal agent does the actual work:
 
-- writing the PM draft
-- writing the Critic review
+- reads the request file
+- writes the output file
+- returns control to the operator for the next stage
 
-That separation lets a team keep using Codex, Claude, or another internal assistant without rewriting the workflow layer.
+## Default Demo Contract
 
-## Supported Handoff Styles
+The default demo path is `file_handoff`.
 
-### 1. Chat handoff
+Before the demo starts, prepare the stable runtime files:
 
-Use this when you want the fastest manual loop.
-
-1. Generate the PM or Critic packet in the app
-2. Copy the packet into a Codex or Claude chat
-3. Tell the agent to return Markdown only
-4. Paste the result back into the app
-
-This is the simplest pattern for non-developers.
-
-### 2. File handoff
-
-Use this when your agent can read local files.
-
-1. Generate the packet in the app
-2. Give the external agent the packet file path under `project/runs/`
-3. Let the agent read that file directly
-4. Capture the Markdown response and paste it back into the app
-
-This is useful for Codex / Claude Code style tools that can work from file paths.
-
-### 3. Parallel handoff
-
-Use this when you want PM and Critic to run in separate threads.
-
-1. Generate the PM packet and send it to one agent thread
-2. Ingest the PM result
-3. Generate the Critic packet
-4. Send that packet to a second thread or even a different agent product
-5. Ingest the review back into the harness
-
-This mirrors how role-based AI teams are often demonstrated in practice.
-
-## Contract the External Agent Must Respect
-
-### PM output
-
-The PM agent should return a clean Markdown draft with the expected sections, for example:
-
-- background
-- goals
-- functional requirements
-- non-functional requirements
-- open issues
-- next actions
-
-### Critic output
-
-The Critic agent must return Markdown with YAML frontmatter. The current viewer parses this directly.
-
-Example:
-
-```markdown
----
-verdict: revise
-summary: The draft is clear but still misses measurable success criteria.
-missing_items:
-  - success metrics
-recommended_changes:
-  - add acceptance criteria for rollout readiness
----
-The draft is structurally sound, but the business owner still cannot decide whether the PoC is ready for sign-off.
+```powershell
+python scripts/prepare_react_demo_handoff.py
 ```
+
+This creates:
+
+- `project/runs/demo_requirements_draft_request.md`
+- `project/runs/demo_requirements_review_request.md`
+- `project/artifacts/demo_requirements_draft.md`
+- `project/artifacts/demo_requirements_review.md`
+
+These are the stable files the React demo and the personal agent both point to.
+
+## PM Agent Flow
+
+1. Open `Task` in React.
+2. Move to `에이전트 전달`.
+3. Confirm the PM request file path:
+   - `project/runs/demo_requirements_draft_request.md`
+4. Let the PM agent read that file directly.
+5. The PM agent writes the result to:
+   - `project/artifacts/demo_requirements_draft.md`
+6. Return to React and use `작업 완료 확인` to continue.
+
+## Critic Agent Flow
+
+1. Move to the Critic handoff step in React.
+2. Confirm the Critic request file path:
+   - `project/runs/demo_requirements_review_request.md`
+3. Let the Critic agent read that file directly.
+4. The Critic agent writes the result to:
+   - `project/artifacts/demo_requirements_review.md`
+5. Return to React and use `작업 완료 확인` to continue.
+
+## What React Does Not Do In This Demo
+
+The current demo does **not**:
+
+- upload results back into React
+- parse output files live
+- perform actual Jira / Confluence write-back
+- own the full workflow persistence loop
+
+React stays honest as a `workspace / handoff / confirmation` surface.
+
+## Optional Fallback
+
+`copy_paste` still exists as a fallback mode.
+
+Use it only when the external agent cannot read local files directly.
+The primary demo path remains `file_handoff`.
 
 ## Codex Example
 
-A typical Codex prompt can be as small as:
+For a Codex thread with workspace access, a minimal ask is:
 
-> Read the attached packet and return only the requested Markdown output. Do not explain your process.
+> Read `project/runs/demo_requirements_draft_request.md`, follow the contract, and write the result to `project/artifacts/demo_requirements_draft.md`.
 
-If you are using Codex with workspace access, the best experience is usually file handoff so the agent can read the packet directly.
+For Critic:
 
-## Claude Example
-
-A typical Claude prompt can be:
-
-> Use this packet as the full task contract. Return only the finished Markdown artifact, with no preamble.
-
-For a browser chat, copy-paste handoff is usually enough.
+> Read `project/runs/demo_requirements_review_request.md`, follow the contract, and write the result to `project/artifacts/demo_requirements_review.md`.
 
 ## Why This Matters
 
-This model keeps the harness stable even when the execution agent changes.
+This keeps the product story consistent:
 
-The user does not have to choose between:
+- React prepares the handoff
+- the user's own agent does the work
+- React confirms the next stage and the final team-share destination
 
-- a workflow app with no real agent flexibility
-- a powerful agent with no memory of project context or operational traceability
-
-The harness provides the memory, traceability, and synchronization layer. Codex or Claude provides the reasoning step.
+That is the behavior we want the demo to prove.

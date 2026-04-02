@@ -58,11 +58,12 @@ The current demo expresses this promise through a 3-step workspace:
 
 ### `file_handoff`
 
-- the app prepares the brief and a file path
-- the user hands the file path to their agent
+- the app prepares a stable request file path and a stable output file path
+- the user hands the request file path to their agent
+- the agent reads the request file directly and writes the result to the output path
 - the user returns to the workspace and confirms the next stage after the agent work
 
-The current React demo shows both modes explicitly.
+The current React demo shows both modes explicitly, but the primary demo path is `file_handoff`.
 
 ## User-Visible Workflow States
 
@@ -89,7 +90,7 @@ Use these front-stage labels:
 
 - `brief ready`
 - `send to agent`
-- `confirm response ready`
+- `confirm work complete`
 - `request review`
 - `apply review`
 - `prepare team share`
@@ -128,11 +129,11 @@ Those remain implementation details.
 1. The user opens a task.
 2. The workspace shows the current task, the connected PM agent, and the next action.
 3. The user opens `Agent Handoff`.
-4. The workspace shows the brief, the selected handoff mode, and the expected response.
-5. The user sends the brief to their PM agent.
+4. The workspace shows the brief, the selected handoff mode, the request file path, and the output file path.
+5. The user sends the request file to their PM agent.
 6. The user completes the PM work in their own agent and returns to the workspace.
 7. The workspace moves to Critic review.
-8. The user sends the Critic brief to their Critic agent.
+8. The user sends the Critic request file to their Critic agent.
 9. The user completes the Critic review in their own agent and returns to the workspace.
 10. The workspace shows `ready_for_decision` or `revise`.
 11. The operator decides whether to share or revise.
@@ -155,17 +156,17 @@ The UI should avoid showing raw storage paths or machine metadata as the main st
 ### Task title
 
 - short, human-readable, outcome-oriented
-- example: `Japan launch brief`
+- example: `점포 운영 AI 적용 범위 정리`
 
 ### Draft title
 
 - readable as a team document
-- example: `Japan launch brief draft`
+- example: `요구사항 정의서 초안`
 
 ### Review title
 
 - readable as a team review state
-- example: `Launch brief review`
+- example: `요구사항 초안 검토 의견`
 
 ## Next Technical Seam
 
