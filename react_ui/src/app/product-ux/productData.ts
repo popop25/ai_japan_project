@@ -78,29 +78,29 @@ const HANDOFF_MODES: HandoffModeOption[] = [
 const AGENTS: AgentRecord[] = [
   {
     id: "pm-agent",
-    name: "My Codex",
+    name: "내 에이전트",
     roleId: "pm",
     roleLabel: "PM Agent",
     responsibility: "Drafts the first brief the team can react to.",
-    productLabel: "Codex",
+    productLabel: "Personal agent",
     focus: "brief drafting",
     status: "connected",
     statusNote: "다음 PM handoff를 바로 이어갈 수 있는 상태입니다.",
   },
   {
     id: "critic-agent",
-    name: "My Claude",
+    name: "내 에이전트",
     roleId: "critic",
     roleLabel: "Critic Agent",
     responsibility: "Checks clarity, missing decisions, and share readiness.",
-    productLabel: "Claude",
+    productLabel: "Personal agent",
     focus: "quality review",
     status: "connected",
     statusNote: "PM 초안이 돌아오면 바로 검토를 시작할 수 있습니다.",
   },
   {
     id: "ops-agent",
-    name: "Workspace sync",
+    name: "작업 공간",
     roleId: "ops",
     roleLabel: "Ops Agent",
     responsibility: "Prepares the final Jira and Confluence share state.",
@@ -182,7 +182,7 @@ PM 초안을 읽고 아래를 확인합니다.
     pmResult: {
       id: "result-japan-launch-draft",
       title: "요구사항 정의서 초안",
-      fromAgentLabel: "My Codex",
+      fromAgentLabel: "내 에이전트",
       summary: "1차 적용 범위, 빠진 담당자, 팀 공유 전에 확인할 결정 사항을 정리했습니다.",
       status: "ready",
       updatedAt: "방금 전",
@@ -190,7 +190,7 @@ PM 초안을 읽고 아래를 확인합니다.
     criticResult: {
       id: "result-japan-launch-review",
       title: "요구사항 초안 검토 의견",
-      fromAgentLabel: "My Claude",
+      fromAgentLabel: "내 에이전트",
       summary: "팀 공유 전에 담당자 공백 1건과 운영 의존성 1건을 더 확인해야 합니다.",
       status: "review",
       updatedAt: "방금 전",
@@ -202,7 +202,7 @@ PM 초안을 읽고 아래를 확인합니다.
     ],
     sources: [
       { id: "japan-source-context", title: "03_Context", type: "Confluence", freshness: "오늘 업데이트", note: "점포 운영 제약 사항과 범위 기준" },
-      { id: "japan-source-task", title: "KAN-9", type: "Jira", freshness: "12분 전 업데이트", note: "현재 작업 담당자와 마감 일정" },
+      { id: "japan-source-task", title: "KAN-12", type: "Jira", freshness: "방금 전 업데이트", note: "현재 데모 작업의 상태와 다음 공유 단계" },
       { id: "japan-source-note", title: "점포 운영 인터뷰 메모", type: "Workspace note", freshness: "오늘 오전 수정", note: "반복 문의 패턴과 빠진 담당자" },
     ],
     shareStates: {

@@ -67,6 +67,16 @@ The current demo does **not**:
 
 React stays honest as a `workspace / handoff / confirmation` surface.
 
+## Optional Pre-Demo Publish Step
+
+If we want one Jira issue and the related Confluence pages ready before recording, use the Python harness separately:
+
+```powershell
+python scripts/publish_react_demo_outputs.py --cleanup-existing
+```
+
+This does not change the React contract. It simply takes the current output files, creates the external team-facing resources, and prints the Jira / Confluence links that can be used as the final proof shot.
+
 ## Optional Fallback
 
 `copy_paste` still exists as a fallback mode.

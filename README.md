@@ -99,6 +99,16 @@ This writes the stable demo runtime files used by the personal-agent flow:
 - `project/artifacts/demo_requirements_draft.md`
 - `project/artifacts/demo_requirements_review.md`
 
+## Publish The Current Demo Outputs To Jira / Confluence
+
+This is a separate Python-harness step for preparing a team-facing proof surface before the demo.
+
+```powershell
+python scripts/publish_react_demo_outputs.py --cleanup-existing
+```
+
+This reads the current demo output files, creates one Jira task, publishes the PM draft and Critic review to Confluence, and saves a cleanup receipt under the demo prefix.
+
 ## Run The React Demo
 
 ```powershell
